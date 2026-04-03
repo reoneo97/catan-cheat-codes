@@ -9,6 +9,9 @@ body {
   font-size: 13px;
   background: #1a1a2e;
   color: #e0e0e0;
+}
+
+.container {
   min-width: 320px;
   padding: 12px;
 }
@@ -27,7 +30,7 @@ h1 {
   letter-spacing: 0.5px;
 }
 
-#reset-btn {
+.reset-btn {
   background: #c0392b;
   color: #fff;
   border: none;
@@ -37,11 +40,11 @@ h1 {
   cursor: pointer;
 }
 
-#reset-btn:hover {
+.reset-btn:hover {
   background: #e74c3c;
 }
 
-#no-data {
+.no-data {
   text-align: center;
   color: #888;
   padding: 20px 0;
@@ -53,7 +56,8 @@ table {
   border-collapse: collapse;
 }
 
-th, td {
+th,
+td {
   text-align: center;
   padding: 6px 8px;
   border-bottom: 1px solid #2a2a4a;
@@ -79,7 +83,7 @@ th {
   color: #f0c040;
 }
 
-tr:hover td {
+tbody tr:hover td {
   background: #22224a;
 }
 
