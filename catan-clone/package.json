@@ -1,0 +1,13 @@
+{
+  "name": "catan-clone",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @catan/server\" \"npm run dev -w @catan/client\"",
+    "build": "npm run build -w @catan/shared && npm run build -w @catan/server && npm run build -w @catan/client"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.5.4"
+  }
+}
