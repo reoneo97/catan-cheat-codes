@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Catan Resource Tracker",
+  "version": "1.0.0",
+  "description": "Tracks resources gained by each player on colonist.io",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://colonist.io/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://colonist.io/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Catan Resource Tracker"
+  }
+}
