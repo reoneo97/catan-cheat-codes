@@ -1,6 +1,12 @@
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import type { ClientGameState, Player, ResourceType } from "@catan/shared";
 import { RESOURCE_TYPES } from "@catan/shared";
 import { useGameStore } from "../store.js";
+import { TipOfTheDay } from "./TipOfTheDay.js";
+import { TradePanel } from "./TradePanel.js";
+import { DevCardPanel } from "./DevCardPanel.js";
+import { DiceDisplay } from "./DiceDisplay.js";
 
 const RESOURCE_EMOJI: Record<ResourceType, string> = {
   wood: "🌲", brick: "🧱", wheat: "🌾", ore: "⛰️", sheep: "🐑",
@@ -10,16 +16,70 @@ const PLAYER_COLOR: Record<string, string> = {
   red: "#e74c3c", blue: "#2980b9", green: "#27ae60", orange: "#e67e22",
 };
 
+type GainToast = { id: number; label: string; x: number };
+
+function ResourceGainOverlay({ resources }: { resources: Record<string, number> }) {
+  const prevRef = useRef<Record<string, number> | null>(null);
+  const [toasts, setToasts] = useState<GainToast[]>([]);
+  const nextId = useRef(0);
+
+  useEffect(() => {
+    if (prevRef.current === null) {
+      prevRef.current = { ...resources };
+      return;
+    }
+    const gained: GainToast[] = [];
+    const slots = [15, 35, 55, 75, 90];
+    let slot = 0;
+    for (const r of RESOURCE_TYPES) {
+      const diff = (resources[r] ?? 0) - (prevRef.current[r] ?? 0);
+      if (diff > 0) {
+        gained.push({ id: ++nextId.current, label: `+${diff}${RESOURCE_EMOJI[r]}`, x: slots[slot % slots.length] });
+        slot++;
+      }
+    }
+    prevRef.current = { ...resources };
+    if (gained.length === 0) return;
+    setToasts((prev) => [...prev, ...gained]);
+    const ids = new Set(gained.map((t) => t.id));
+    const timer = setTimeout(() => setToasts((prev) => prev.filter((t) => !ids.has(t.id))), 1300);
+    return () => clearTimeout(timer);
+  }, [resources]);
+
+  return (
+    <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "visible" }}>
+      {toasts.map((t) => (
+        <span
+          key={t.id}
+          style={{
+            position: "absolute",
+            left: `${t.x}%`,
+            bottom: "50%",
+            fontSize: 15,
+            fontWeight: "bold",
+            color: "#f0c040",
+            textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+            animation: "resourceFloat 1.3s ease-out forwards",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {t.label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function ResourceHand({ resources, isMe }: { resources: Record<string, number>; isMe: boolean }) {
   if (!isMe) {
     const total = RESOURCE_TYPES.reduce((s, r) => s + (resources[r] ?? 0), 0);
     return <span style={{ color: "#aaa" }}>{total} cards</span>;
   }
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+    <div style={{ display: "flex", gap: 8, flexWrap: "nowrap" }}>
       {RESOURCE_TYPES.map((r) => (
-        <span key={r} style={{ fontSize: 12 }}>
-          {RESOURCE_EMOJI[r]} {resources[r] ?? 0}
+        <span key={r} style={{ fontSize: 20, lineHeight: 1.2 }}>
+          {RESOURCE_EMOJI[r]}<span style={{ fontSize: 13, fontWeight: "bold", verticalAlign: "middle" }}>{resources[r] ?? 0}</span>
         </span>
       ))}
     </div>
@@ -27,6 +87,7 @@ function ResourceHand({ resources, isMe }: { resources: Record<string, number>; 
 }
 
 function PlayerCard({ player, state }: { player: Player; state: ClientGameState }) {
+  const { setHoveredRoadPlayer } = useGameStore();
   const isMe = player.id === state.myPlayerId;
   const isCurrentPlayer = state.players[state.currentPlayerIndex]?.id === player.id;
 
@@ -34,42 +95,86 @@ function PlayerCard({ player, state }: { player: Player; state: ClientGameState 
     <div
       style={{
         border: `2px solid ${PLAYER_COLOR[player.color]}`,
+        borderLeft: `5px solid ${PLAYER_COLOR[player.color]}`,
         borderRadius: 8,
         padding: "8px 12px",
-        background: isCurrentPlayer ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.2)",
+        background: isCurrentPlayer ? "rgba(255,255,255,0.1)" : "rgba(0,0,0,0.2)",
         opacity: player.connected ? 1 : 0.5,
+        boxShadow: isCurrentPlayer ? `0 0 10px ${PLAYER_COLOR[player.color]}55` : "none",
+        transition: "box-shadow 0.2s",
+        position: "relative",
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+      {isMe && <ResourceGainOverlay resources={player.resources} />}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
         <strong style={{ color: PLAYER_COLOR[player.color] }}>
-          {isCurrentPlayer ? "▶ " : ""}{player.name}
+          {player.name}
           {isMe ? " (you)" : ""}
-          {player.hasLargestArmy ? " 🗡️" : ""}
-          {player.hasLongestRoad ? " 🛣️" : ""}
         </strong>
+        {isCurrentPlayer && (
+          <span style={{ fontSize: 10, background: "#f0c040", color: "#1a1a1a", borderRadius: 4, padding: "1px 5px", fontWeight: "bold", marginLeft: 6 }}>
+            ▶ TURN
+          </span>
+        )}
         <span style={{ color: "#f0c040", fontWeight: "bold" }}>
           {player.publicVP} VP
         </span>
       </div>
       <ResourceHand resources={player.resources} isMe={isMe} />
-      <div style={{ fontSize: 11, color: "#888", marginTop: 4 }}>
-        🏠 {5 - player.remainingSettlements} &nbsp;
-        🏙️ {4 - player.remainingCities} &nbsp;
-        🛣️ {15 - player.remainingRoads} roads &nbsp;
-        🃏 {player.devCards.length} dev
+      <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {[
+          { emoji: "🏠", placed: 5 - player.remainingSettlements, total: 5 },
+          { emoji: "🏙️", placed: 4 - player.remainingCities, total: 4 },
+        ].map(({ emoji, placed, total }) => (
+          <span key={emoji} style={{ fontSize: 18 }}>
+            {emoji}{" "}
+            {Array.from({ length: total }, (_, i) => (
+              <span key={i} style={{ color: i < placed ? PLAYER_COLOR[player.color] : "#555", fontSize: 14 }}>
+                {i < placed ? "●" : "○"}
+              </span>
+            ))}
+          </span>
+        ))}
+        {/* Road count — hover highlights longest road on board */}
+        <span
+          style={{ fontSize: 18, color: "#aaa", cursor: "pointer" }}
+          title="Hover to highlight longest road"
+          onMouseEnter={() => setHoveredRoadPlayer(player.id)}
+          onMouseLeave={() => setHoveredRoadPlayer(null)}
+        >
+          🛣️ <span style={{ fontSize: 14, fontWeight: "bold", verticalAlign: "middle" }}>{15 - player.remainingRoads}</span>
+        </span>
+        <span style={{ fontSize: 18, color: "#aaa" }}>
+          🃏 <span style={{ fontSize: 14, fontWeight: "bold", verticalAlign: "middle" }}>{player.devCards.length}</span>
+        </span>
+        {/* Milestone badges */}
+        {player.hasLargestArmy && (
+          <span
+            title={`Largest Army (${player.knightsPlayed} knights)`}
+            style={{ fontSize: 13, background: "#7c3aed", color: "#fff", borderRadius: 5, padding: "2px 6px", fontWeight: "bold" }}
+          >
+            ⚔️ Army
+          </span>
+        )}
+        {player.hasLongestRoad && (
+          <span
+            title="Longest Road"
+            style={{ fontSize: 13, background: "#0369a1", color: "#fff", borderRadius: 5, padding: "2px 6px", fontWeight: "bold" }}
+          >
+            🛣️ Road
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
 export function PlayerPanel({ state }: { state: ClientGameState }) {
-  const { sendAction } = useGameStore();
+  const { sendAction, restartGame, leave } = useGameStore();
+  const navigate = useNavigate();
   const myId = state.myPlayerId;
   const me = state.players.find((p) => p.id === myId);
   const isMyTurn = state.players[state.currentPlayerIndex]?.id === myId;
-
-  const needsDiscard =
-    state.turnPhase === "discarding" && state.pendingDiscards[myId] !== undefined;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -77,8 +182,11 @@ export function PlayerPanel({ state }: { state: ClientGameState }) {
         <PlayerCard key={p.id} player={p} state={state} />
       ))}
 
+      {/* Dice */}
+      {state.phase === "main" && <DiceDisplay state={state} />}
+
       {/* Action buttons */}
-      {isMyTurn && (
+      {isMyTurn && state.phase === "main" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
           {state.turnPhase === "preRoll" && (
             <button onClick={() => sendAction({ type: "rollDice" })}>🎲 Roll Dice</button>
@@ -92,12 +200,25 @@ export function PlayerPanel({ state }: { state: ClientGameState }) {
         </div>
       )}
 
-      {needsDiscard && (
-        <div style={{ color: "#e74c3c", fontWeight: "bold", padding: 8, border: "1px solid #e74c3c", borderRadius: 6 }}>
-          You must discard {state.pendingDiscards[myId]} cards!
-          {/* TODO: implement discard UI */}
-        </div>
+      {/* Dev cards, discard, steal */}
+      {state.phase === "main" && <DevCardPanel state={state} />}
+
+      {/* Trading */}
+      {state.phase === "main" && (isMyTurn && state.turnPhase === "postRoll" || state.tradeOffer !== null) && (
+        <TradePanel state={state} isMyTurn={isMyTurn} />
       )}
+
+      <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+        <button onClick={restartGame} style={{ flex: 1, background: "#7f1d1d", color: "#fff", border: "none", borderRadius: 4, padding: "4px 10px", cursor: "pointer" }}>
+          🔄 Restart
+        </button>
+        <button
+          onClick={() => { leave(); navigate("/"); }}
+          style={{ flex: 1, background: "#1a1a2e", color: "#aaa", border: "1px solid #30363d", borderRadius: 4, padding: "4px 10px", cursor: "pointer" }}
+        >
+          🚪 Quit
+        </button>
+      </div>
 
       {/* Game log */}
       <div
@@ -116,6 +237,7 @@ export function PlayerPanel({ state }: { state: ClientGameState }) {
           <div key={i}>{entry}</div>
         ))}
       </div>
+      <TipOfTheDay />
     </div>
   );
 }
