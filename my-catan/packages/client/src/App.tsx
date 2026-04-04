@@ -6,6 +6,7 @@ import { BoardView } from "./components/Board.js";
 import { PlayerPanel } from "./components/PlayerPanel.js";
 import { TipOfTheDay } from "./components/TipOfTheDay.js";
 import { FlyingResourcesOverlay } from "./components/FlyingResourcesOverlay.js";
+import { TradeOfferOverlay } from "./components/TradeOfferOverlay.js";
 import "./App.css";
 
 const PLAYER_COLOR: Record<string, string> = {
@@ -244,6 +245,7 @@ function RoomPage() {
         <div className="game-layout">
           <div className="board-area">
             <BoardView state={gameState} />
+            {gameState.tradeOffer && <TradeOfferOverlay state={gameState} />}
           </div>
           <div className="panel-area">
             <PlayerPanel state={gameState} />

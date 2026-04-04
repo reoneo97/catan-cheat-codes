@@ -225,9 +225,9 @@ export function PlayerPanel({ state }: { state: ClientGameState }) {
       {/* Dev cards, discard, steal */}
       {state.phase === "main" && <DevCardPanel state={state} />}
 
-      {/* Trading */}
-      {state.phase === "main" && (isMyTurn && state.turnPhase === "postRoll" || state.tradeOffer !== null) && (
-        <TradePanel state={state} isMyTurn={isMyTurn} />
+      {/* Trading — bank trade + offer creation (active offers shown as board overlay) */}
+      {state.phase === "main" && isMyTurn && state.turnPhase === "postRoll" && (
+        <TradePanel state={state} />
       )}
 
       <div style={{ display: "flex", gap: 8, marginTop: 4 }}>

@@ -9,10 +9,6 @@ const EMOJI: Record<ResourceType, string> = {
   wood: "🌲", brick: "🧱", wheat: "🌾", ore: "⛰️", sheep: "🐑",
 };
 
-const PLAYER_COLOR: Record<string, string> = {
-  red: "#e74c3c", blue: "#2980b9", green: "#27ae60", orange: "#e67e22",
-};
-
 function portRatio(state: ClientGameState, playerId: string, resource: ResourceType): number {
   let ratio = 4;
   for (const [vid, building] of Object.entries(state.board.buildings)) {
@@ -23,12 +19,6 @@ function portRatio(state: ClientGameState, playerId: string, resource: ResourceT
     if (port.resource === "generic") ratio = Math.min(ratio, port.ratio);
   }
   return ratio;
-}
-
-function resSummary(res: PartialRes): string {
-  return RESOURCE_TYPES.filter((r) => (res[r] ?? 0) > 0)
-    .map((r) => `${res[r]}×${EMOJI[r]}`)
-    .join("  ");
 }
 
 // ── Resource counter row ──────────────────────────────────────────────────────
@@ -166,17 +156,14 @@ function BankTrade({ state }: { state: ClientGameState }) {
   );
 }
 
-// ── Player trade ──────────────────────────────────────────────────────────────
+// ── Player trade offer creation ───────────────────────────────────────────────
 
-function PlayerTrade({ state, isMyTurn }: { state: ClientGameState; isMyTurn: boolean }) {
+function PlayerTradeForm({ state }: { state: ClientGameState }) {
   const { sendAction } = useGameStore();
   const [give, setGive] = useState<PartialRes>({});
   const [want, setWant] = useState<PartialRes>({});
 
-  const myId = state.myPlayerId;
-  const me = state.players.find((p) => p.id === myId)!;
-  const offer = state.tradeOffer;
-  const isMyOffer = offer?.fromPlayerId === myId;
+  const me = state.players.find((p) => p.id === state.myPlayerId)!;
 
   function changeGive(r: ResourceType, delta: number) {
     setGive((g) => ({ ...g, [r]: Math.max(0, Math.min(me.resources[r] ?? 0, (g[r] ?? 0) + delta)) }));
@@ -188,71 +175,9 @@ function PlayerTrade({ state, isMyTurn }: { state: ClientGameState; isMyTurn: bo
   const totalGive = RESOURCE_TYPES.reduce((s, r) => s + (give[r] ?? 0), 0);
   const totalWant = RESOURCE_TYPES.reduce((s, r) => s + (want[r] ?? 0), 0);
 
-  // ── Responding to someone else's offer ──
-  if (offer && !isMyOffer) {
-    const offerer = state.players.find((p) => p.id === offer.fromPlayerId);
-    const myResponse = offer.responses[myId];
-    const canAccept = RESOURCE_TYPES.every((r) => (me.resources[r] ?? 0) >= (offer.want[r] ?? 0));
-
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ fontSize: 12 }}>
-          <strong style={{ color: PLAYER_COLOR[offerer?.color ?? ""] }}>{offerer?.name}</strong> offers:
-        </div>
-        <div style={{ fontSize: 12, background: "#0d1117", borderRadius: 6, padding: "6px 10px", lineHeight: 1.8 }}>
-          <div>Gives you: <strong>{resSummary(offer.give) || "—"}</strong></div>
-          <div>Wants: <strong>{resSummary(offer.want) || "—"}</strong></div>
-        </div>
-        {myResponse === null && (
-          <div style={{ display: "flex", gap: 6 }}>
-            <button disabled={!canAccept} onClick={() => sendAction({ type: "respondTrade", offerId: offer.id, response: "accept" })}
-              style={{ flex: 1, background: "#27ae60", color: "#fff" }}>✓ Accept</button>
-            <button onClick={() => sendAction({ type: "respondTrade", offerId: offer.id, response: "reject" })}
-              style={{ flex: 1, background: "#e74c3c", color: "#fff" }}>✕ Reject</button>
-          </div>
-        )}
-        {myResponse === "accept" && <div style={{ color: "#27ae60", fontSize: 12 }}>✓ Accepted — waiting for {offerer?.name}</div>}
-        {myResponse === "reject" && <div style={{ color: "#e74c3c", fontSize: 12 }}>✕ Rejected</div>}
-      </div>
-    );
-  }
-
-  // ── Managing your own active offer ──
-  if (isMyOffer && offer) {
-    const others = state.players.filter((p) => p.id !== myId);
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <div style={{ fontSize: 12, background: "#0d1117", borderRadius: 6, padding: "6px 10px", lineHeight: 1.8 }}>
-          <div>Giving: <strong>{resSummary(offer.give) || "—"}</strong></div>
-          <div>Wanting: <strong>{resSummary(offer.want) || "—"}</strong></div>
-        </div>
-        {others.map((p) => {
-          const resp = offer.responses[p.id];
-          return (
-            <div key={p.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 13 }}>
-              <span style={{ color: PLAYER_COLOR[p.color] }}>{p.name}</span>
-              {resp === null && <span style={{ color: "#555" }}>waiting…</span>}
-              {resp === "reject" && <span style={{ color: "#e74c3c" }}>✕ Rejected</span>}
-              {resp === "accept" && (
-                <button onClick={() => sendAction({ type: "acceptTrade", partnerId: p.id })}
-                  style={{ background: "#27ae60", color: "#fff", padding: "3px 10px", fontSize: 12 }}>
-                  ✓ Trade with {p.name}
-                </button>
-              )}
-            </div>
-          );
-        })}
-        <button onClick={() => sendAction({ type: "cancelTrade" })}
-          style={{ background: "#30363d", color: "#aaa" }}>
-          Cancel Offer
-        </button>
-      </div>
-    );
-  }
-
-  // ── Creating a new offer (only when it's your turn) ──
-  if (!isMyTurn) {
-    return <div style={{ fontSize: 12, color: "#555", textAlign: "center" }}>No active trade offer.</div>;
+  // Disable creation while an offer is already active
+  if (state.tradeOffer) {
+    return <div style={{ fontSize: 12, color: "#666", textAlign: "center" }}>Offer in progress — see board overlay</div>;
   }
 
   return (
@@ -273,9 +198,8 @@ function PlayerTrade({ state, isMyTurn }: { state: ClientGameState; isMyTurn: bo
 
 // ── Exported panel ────────────────────────────────────────────────────────────
 
-export function TradePanel({ state, isMyTurn }: { state: ClientGameState; isMyTurn: boolean }) {
+export function TradePanel({ state }: { state: ClientGameState }) {
   const [tab, setTab] = useState<"bank" | "player">("bank");
-  const hasOffer = state.tradeOffer !== null;
 
   const tabStyle = (active: boolean): React.CSSProperties => ({
     flex: 1,
@@ -294,14 +218,9 @@ export function TradePanel({ state, isMyTurn }: { state: ClientGameState; isMyTu
     <div style={{ border: "1px solid #30363d", borderRadius: 8, padding: 10 }}>
       <div style={{ display: "flex", gap: 4, marginBottom: 10 }}>
         <button style={tabStyle(tab === "bank")} onClick={() => setTab("bank")}>🏦 Bank</button>
-        <button style={tabStyle(tab === "player")} onClick={() => setTab("player")}>
-          🤝 Players{hasOffer ? " 🔔" : ""}
-        </button>
+        <button style={tabStyle(tab === "player")} onClick={() => setTab("player")}>🤝 Offer</button>
       </div>
-      {tab === "bank"
-        ? <BankTrade state={state} />
-        : <PlayerTrade state={state} isMyTurn={isMyTurn} />
-      }
+      {tab === "bank" ? <BankTrade state={state} /> : <PlayerTradeForm state={state} />}
     </div>
   );
 }
