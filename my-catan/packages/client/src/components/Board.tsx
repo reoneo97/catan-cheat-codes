@@ -231,18 +231,51 @@ function HexTile({ tile, onClick, animDelay, skipAnim, activated }: { tile: Tile
           const dotY = center.y + 27;
           const dotStartX = center.x - ((n - 1) * dotSpacing) / 2;
           return (
-            <g filter="url(#token-shadow)">
-              <rect x={center.x - 16} y={center.y + 3} width={32} height={28} rx={5} fill="white" opacity={0.92} />
-              <text
-                x={center.x} y={center.y + 14}
-                textAnchor="middle" fontSize={13} fontWeight="bold" dominantBaseline="middle"
-                fill={isHot ? "#c0392b" : "#222"}
-              >
-                {tile.number}
-              </text>
-              {Array.from({ length: n }, (_, i) => (
-                <circle key={i} cx={dotStartX + i * dotSpacing} cy={dotY} r={2.5} fill={dotColor} />
-              ))}
+            <g>
+              {/* Glow halo around the token when this number is rolled */}
+              {activated && (
+                <rect
+                  x={center.x - 21} y={center.y - 1}
+                  width={42} height={36} rx={8}
+                  fill="rgba(255,220,50,0.3)"
+                  stroke="#f0c040"
+                  strokeWidth={3}
+                  style={{
+                    transformBox: "fill-box",
+                    transformOrigin: "center",
+                    animation: "tokenGlow 1.8s ease-in-out both",
+                    pointerEvents: "none",
+                  }}
+                />
+              )}
+              <g filter="url(#token-shadow)">
+                <rect x={center.x - 16} y={center.y + 3} width={32} height={28} rx={5} fill="white" opacity={0.92} />
+                <text
+                  x={center.x} y={center.y + 14}
+                  textAnchor="middle" fontSize={13} fontWeight="bold" dominantBaseline="middle"
+                  fill={isHot ? "#c0392b" : "#222"}
+                >
+                  {tile.number}
+                </text>
+                {Array.from({ length: n }, (_, i) => (
+                  <circle key={i} cx={dotStartX + i * dotSpacing} cy={dotY} r={2.5} fill={dotColor} />
+                ))}
+              </g>
+              {/* Resource emoji rises from tile when it produces */}
+              {activated && TERRAIN_LABEL[tile.terrain] && (
+                <text
+                  x={center.x} y={center.y - 10}
+                  textAnchor="middle" fontSize={26}
+                  style={{
+                    transformBox: "fill-box",
+                    transformOrigin: "center bottom",
+                    animation: "resourceRise 1.5s ease-out both",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {TERRAIN_LABEL[tile.terrain]}
+                </text>
+              )}
             </g>
           );
         })()}
@@ -250,21 +283,6 @@ function HexTile({ tile, onClick, animDelay, skipAnim, activated }: { tile: Tile
           <g>
             <circle cx={center.x} cy={center.y + 22} r={16} fill="rgba(0,0,0,0.55)" />
             <text x={center.x} y={center.y + 22} textAnchor="middle" dominantBaseline="middle" fontSize={20}>🥷</text>
-          </g>
-        )}
-        {activated && (
-          <g style={{ pointerEvents: "none" }}>
-            <polygon
-              points={points}
-              fill="rgba(255,210,30,0.18)"
-              stroke="#f0c040"
-              strokeWidth={4}
-              style={{
-                transformBox: "fill-box",
-                transformOrigin: "center",
-                animation: "tilePulse 1.8s ease-in-out both",
-              }}
-            />
           </g>
         )}
       </g>
@@ -494,12 +512,11 @@ export function BoardView({ state }: BoardProps) {
         const road = board.roads[eid];
         const isSelected = selectedEdgeId === eid;
 
-        // Inset endpoints 18% from each vertex so roads don't overlap buildings
-        const INSET = 0.18;
-        const rx1 = p1.x + (p2.x - p1.x) * INSET;
-        const ry1 = p1.y + (p2.y - p1.y) * INSET;
-        const rx2 = p2.x + (p1.x - p2.x) * INSET;
-        const ry2 = p2.y + (p1.y - p2.y) * INSET;
+        // Roads run the full edge so connected roads are clearly joined
+        const rx1 = p1.x;
+        const ry1 = p1.y;
+        const rx2 = p2.x;
+        const ry2 = p2.y;
 
         const isHighlighted = highlightedRoadEdges.has(eid);
         return (

@@ -137,12 +137,19 @@ input:focus { outline: none; border-color: #f0c040; }
 .catan-die { transition: transform 0.1s; }
 .catan-die--rolling { animation: diceShake 0.65s ease-out; }
 
-@keyframes tilePulse {
+@keyframes tokenGlow {
   0%   { opacity: 0; transform: scale(1); }
-  18%  { opacity: 1; transform: scale(1.04); }
-  45%  { opacity: 0.55; transform: scale(1); }
-  72%  { opacity: 0.9; transform: scale(1.04); }
+  20%  { opacity: 1; transform: scale(1.18); }
+  50%  { opacity: 0.65; transform: scale(1.08); }
+  78%  { opacity: 1; transform: scale(1.15); }
   100% { opacity: 0; transform: scale(1); }
+}
+
+@keyframes resourceRise {
+  0%   { opacity: 0; transform: translateY(0) scale(0.5); }
+  15%  { opacity: 1; transform: translateY(-14px) scale(1.35); }
+  65%  { opacity: 0.9; transform: translateY(-52px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-88px) scale(0.9); }
 }
 
 @keyframes resourceFloat {
