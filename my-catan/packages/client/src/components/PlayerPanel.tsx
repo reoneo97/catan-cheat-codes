@@ -76,12 +76,36 @@ function ResourceHand({ resources, isMe }: { resources: Record<string, number>; 
     return <span style={{ color: "#aaa" }}>{total} cards</span>;
   }
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "nowrap" }}>
-      {RESOURCE_TYPES.map((r) => (
-        <span key={r} style={{ fontSize: 20, lineHeight: 1.2 }}>
-          {RESOURCE_EMOJI[r]}<span style={{ fontSize: 13, fontWeight: "bold", verticalAlign: "middle" }}>{resources[r] ?? 0}</span>
-        </span>
-      ))}
+    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+      {RESOURCE_TYPES.map((r) => {
+        const count = resources[r] ?? 0;
+        return (
+          <div
+            key={r}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 1,
+              background: count > 0 ? "rgba(255,255,255,0.07)" : "rgba(255,255,255,0.02)",
+              border: `1px solid ${count > 0 ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.06)"}`,
+              borderRadius: 6,
+              padding: "4px 6px",
+              minWidth: 36,
+            }}
+          >
+            <span style={{ fontSize: 22, lineHeight: 1 }}>{RESOURCE_EMOJI[r]}</span>
+            <span style={{
+              fontSize: 13,
+              fontWeight: "bold",
+              color: count > 0 ? "#f0e0a0" : "#555",
+              lineHeight: 1,
+            }}>
+              {count}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
