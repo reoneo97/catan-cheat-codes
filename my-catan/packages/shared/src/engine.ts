@@ -321,6 +321,15 @@ function applyActionMut(state: GameState, playerId: string, action: Action): voi
     return;
   }
 
+  // Respond to a trade offer (any non-current player can accept/reject)
+  if (action.type === "respondTrade") {
+    assert(state.tradeOffer !== null, "No active trade offer");
+    assert(state.tradeOffer!.id === action.offerId, "Trade offer ID mismatch");
+    assert(playerId in state.tradeOffer!.responses, "Not a trade target");
+    state.tradeOffer!.responses[playerId] = action.response;
+    return;
+  }
+
   // All remaining actions require it to be your turn
   assert(cp.id === playerId, "Not your turn");
 
@@ -574,14 +583,6 @@ function applyActionMut(state: GameState, playerId: string, action: Action): voi
         responses,
       };
       log(state, `${cp.name} offers a trade`);
-      break;
-    }
-
-    case "respondTrade": {
-      assert(state.tradeOffer !== null, "No active trade offer");
-      assert(state.tradeOffer!.id === action.offerId, "Trade offer ID mismatch");
-      assert(playerId in state.tradeOffer!.responses, "Not a trade target");
-      state.tradeOffer!.responses[playerId] = action.response;
       break;
     }
 
