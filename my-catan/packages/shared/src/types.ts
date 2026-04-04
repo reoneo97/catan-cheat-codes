@@ -204,8 +204,9 @@ export interface ServerToClientEvents {
 }
 
 export interface ClientToServerEvents {
-  joinRoom: (roomId: string, playerName: string) => void;
+  joinRoom: (roomId: string, playerName: string, playerId: string) => void;
   startGame: () => void;
+  restartGame: () => void;
   action: (action: Action) => void;
 }
 

@@ -24,23 +24,44 @@ export class GameRoom {
     return this.players.length;
   }
 
+  getRoomPlayers(): Array<{ id: string; name: string; color: PlayerColor }> {
+    return this.players.map((p) => ({ id: p.id, name: p.name, color: p.color }));
+  }
+
   get hasStarted(): boolean {
     return this.state !== null;
   }
 
-  addPlayer(socket: Socket, name: string): RoomPlayer | string {
-    if (this.hasStarted) return "Game already started";
+  addPlayer(socket: Socket, name: string, playerId: string): { player: RoomPlayer; reconnected: boolean } | string {
+    if (this.hasStarted) {
+      const existing = this.players.find((p) => p.id === playerId);
+      if (!existing) return "Game already started";
+
+      // Reconnect: swap in the new socket
+      existing.socketId = socket.id;
+      if (this.state) {
+        const p = this.state.players.find((p) => p.id === playerId);
+        if (p) p.connected = true;
+        this.io.to(socket.id).emit("gameState", this.toClientState(this.state, playerId));
+        this.broadcast();
+      }
+      return { player: existing, reconnected: true };
+    }
+
+    // Deduplicate: same player rejoining before game starts (e.g. page refresh or React StrictMode)
+    const existing = this.players.find((p) => p.id === playerId);
+    if (existing) {
+      existing.socketId = socket.id;
+      return { player: existing, reconnected: false };
+    }
+
     if (this.players.length >= 4) return "Room is full";
 
-    const color = PLAYER_COLORS[this.players.length];
-    const player: RoomPlayer = {
-      id: socket.id,
-      name,
-      color,
-      socketId: socket.id,
-    };
+    const usedColors = new Set(this.players.map((p) => p.color));
+    const color = PLAYER_COLORS.find((c) => !usedColors.has(c))!;
+    const player: RoomPlayer = { id: playerId, name, color, socketId: socket.id };
     this.players.push(player);
-    return player;
+    return { player, reconnected: false };
   }
 
   removePlayer(socketId: string): void {
@@ -53,7 +74,20 @@ export class GameRoom {
       this.broadcast();
     } else {
       this.players = this.players.filter((p) => p.socketId !== socketId);
+      this.io.to(this.id).emit("playerLeft", player.id);
     }
+  }
+
+  restartGame(socketId: string): string | null {
+    if (!this.hasStarted) return "Game not started";
+    if (!this.players.find((p) => p.socketId === socketId)) return "Not in room";
+
+    this.state = createGame(
+      this.id,
+      this.players.map((p) => ({ id: p.id, name: p.name, color: p.color }))
+    );
+    this.broadcast();
+    return null;
   }
 
   startGame(socketId: string): string | null {

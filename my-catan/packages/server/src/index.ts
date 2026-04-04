@@ -9,6 +9,8 @@ const httpServer = createServer(app);
 
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: { origin: "*" },
+  pingInterval: 5000,
+  pingTimeout: 3000,
 });
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
@@ -31,28 +33,34 @@ io.on("connection", (socket) => {
 
   let currentRoomId: string | null = null;
 
-  socket.on("joinRoom", (roomId, playerName) => {
-    if (!roomId || !playerName) {
-      socket.emit("error", "roomId and playerName are required");
+  socket.on("joinRoom", (roomId, playerName, playerId) => {
+    if (!roomId || !playerName || !playerId) {
+      socket.emit("error", "roomId, playerName and playerId are required");
       return;
     }
 
     const room = getOrCreateRoom(roomId);
-    const result = room.addPlayer(socket, playerName);
+    const result = room.addPlayer(socket, playerName, playerId);
 
     if (typeof result === "string") {
       socket.emit("error", result);
       return;
     }
 
+    const { player, reconnected } = result;
     currentRoomId = roomId;
     socket.join(roomId);
-    io.to(roomId).emit("playerJoined", {
-      id: result.id,
-      name: result.name,
-      color: result.color,
-    });
-    console.log(`  ${playerName} joined room ${roomId}`);
+
+    if (reconnected) {
+      socket.emit("gameStarted");
+      console.log(`  ${playerName} reconnected to room ${roomId}`);
+    } else {
+      // Broadcast the full current player list to everyone in the room
+      for (const p of room.getRoomPlayers()) {
+        io.to(roomId).emit("playerJoined", p);
+      }
+      console.log(`  ${playerName} joined room ${roomId}`);
+    }
   });
 
   socket.on("startGame", () => {
@@ -73,6 +81,15 @@ io.on("connection", (socket) => {
     console.log(`  Room ${currentRoomId} game started`);
   });
 
+  socket.on("restartGame", () => {
+    if (!currentRoomId) { socket.emit("error", "Not in a room"); return; }
+    const room = rooms.get(currentRoomId);
+    if (!room) return;
+    const err = room.restartGame(socket.id);
+    if (err) socket.emit("error", err);
+    else console.log(`  Room ${currentRoomId} restarted`);
+  });
+
   socket.on("action", (action) => {
     if (!currentRoomId) {
       socket.emit("error", "Not in a room");
@@ -82,7 +99,10 @@ io.on("connection", (socket) => {
     if (!room) return;
 
     const err = room.handleAction(socket.id, action);
-    if (err) socket.emit("error", err);
+    if (err) {
+      console.error(`[action error] ${socket.id} → ${JSON.stringify(action)} — ${err}`);
+      socket.emit("error", err);
+    }
   });
 
   socket.on("disconnect", () => {
