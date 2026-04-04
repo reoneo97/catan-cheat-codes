@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
+import type { ClientGameState } from "@catan/shared";
 import { useGameStore } from "./store.js";
 import { BoardView } from "./components/Board.js";
 import { PlayerPanel } from "./components/PlayerPanel.js";
@@ -123,11 +124,71 @@ function WaitingRoom() {
   );
 }
 
+// ── Game over overlay ─────────────────────────────────────────────────────────
+
+function GameOverScreen({ state }: { state: ClientGameState }) {
+  const { restartGame, leave } = useGameStore();
+  const navigate = useNavigate();
+  const winner = state.players.find((p) => p.id === state.winnerId);
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 1000,
+    }}>
+      <div style={{
+        background: "#161b22", border: "2px solid #f0c040",
+        borderRadius: 16, padding: "40px 48px",
+        textAlign: "center", minWidth: 340, maxWidth: 420,
+      }}>
+        <div style={{ fontSize: 52, marginBottom: 8 }}>🏆</div>
+        <h2 style={{ color: "#f0c040", fontSize: 28, marginBottom: 6 }}>Game Over</h2>
+        {winner && (
+          <p style={{ color: PLAYER_COLOR[winner.color] ?? "#fff", fontSize: 22, fontWeight: "bold", marginBottom: 24 }}>
+            {winner.name} wins!
+          </p>
+        )}
+
+        {/* Final leaderboard */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 28 }}>
+          {[...state.players]
+            .sort((a, b) => b.publicVP - a.publicVP)
+            .map((p, i) => (
+              <div key={p.id} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "6px 12px", borderRadius: 8,
+                background: p.id === state.winnerId ? "rgba(240,192,64,0.12)" : "rgba(255,255,255,0.03)",
+                border: p.id === state.winnerId ? "1px solid rgba(240,192,64,0.3)" : "1px solid transparent",
+              }}>
+                <span style={{ color: "#777", marginRight: 8, fontSize: 13 }}>#{i + 1}</span>
+                <span style={{ flex: 1, textAlign: "left", color: PLAYER_COLOR[p.color] ?? "#eee", fontWeight: 600 }}>
+                  {p.name}
+                </span>
+                <span style={{ color: "#f0c040", fontWeight: "bold" }}>{p.publicVP} VP</span>
+              </div>
+            ))}
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={restartGame} style={{ flex: 1 }}>🔄 Play Again</button>
+          <button
+            onClick={() => { leave(); navigate("/", { replace: true }); }}
+            style={{ flex: 1, background: "#30363d", color: "#ccc" }}
+          >
+            🚪 Leave
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Room page — handles joining via URL ───────────────────────────────────────
 
 function RoomPage() {
   const { roomId: urlRoomId = "" } = useParams<{ roomId: string }>();
-  const { join, leave, gameState, gameStarted, roomId, error, clearError } = useGameStore();
+  const { join, leave, gameState, roomId, connected, error, clearError } = useGameStore();
   const navigate = useNavigate();
 
   const savedName = localStorage.getItem("catan_name");
@@ -141,25 +202,44 @@ function RoomPage() {
     }
   }, []);
 
-  // If game ends and user restarts, stay on room page
+  // Disconnect guard: if connection drops after being established, redirect home
+  const wasConnected = useRef(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   useEffect(() => {
-    if (gameState && !gameStarted) {
-      // gameState arrived before gameStarted (reconnect case) — that's fine
+    if (connected) {
+      wasConnected.current = true;
+      setDisconnecting(false);
+      return;
     }
-  }, [gameState, gameStarted]);
+    if (!wasConnected.current) return; // haven't connected yet on this page
+    setDisconnecting(true);
+    const t = setTimeout(() => {
+      leave();
+      navigate("/", { replace: true });
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [connected]);
 
   if (!isJoined) {
     return <JoinForm defaultRoom={urlRoomId} />;
   }
 
+  const disconnectBanner = disconnecting && (
+    <div className="error-banner">
+      ⚡ Connection lost — returning to lobby…
+    </div>
+  );
+
   if (gameState) {
     return (
       <div className="app">
+        {disconnectBanner}
         {error && (
           <div className="error-banner" onClick={clearError}>
             ⚠️ {error} <small>(click to dismiss)</small>
           </div>
         )}
+        {gameState.phase === "ended" && <GameOverScreen state={gameState} />}
         <div className="game-layout">
           <div className="board-area">
             <BoardView state={gameState} />
@@ -174,6 +254,7 @@ function RoomPage() {
 
   return (
     <div className="app">
+      {disconnectBanner}
       {error && (
         <div className="error-banner" onClick={clearError}>
           ⚠️ {error} <small>(click to dismiss)</small>
