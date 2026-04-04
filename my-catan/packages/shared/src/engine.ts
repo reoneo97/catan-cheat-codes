@@ -239,7 +239,27 @@ export function applyAction(
 ): GameState {
   const next = cloneState(state);
   applyActionMut(next, playerId, action);
+  syncPublicVP(next);
   return next;
+}
+
+/**
+ * Recomputes publicVP for every player.
+ * publicVP = buildings + special cards + revealed VP dev cards.
+ * Hidden VP cards in hand are intentionally excluded.
+ */
+function syncPublicVP(state: GameState): void {
+  for (const player of state.players) {
+    let vp = 0;
+    for (const building of Object.values(state.board.buildings)) {
+      if (building.playerId !== player.id) continue;
+      vp += building.type === "settlement" ? 1 : 2;
+    }
+    if (player.hasLargestArmy) vp += 2;
+    if (player.hasLongestRoad) vp += 2;
+    vp += player.devCardsPlayed.filter((c) => c === "victoryPoint").length;
+    player.publicVP = vp;
+  }
 }
 
 function applyActionMut(state: GameState, playerId: string, action: Action): void {
