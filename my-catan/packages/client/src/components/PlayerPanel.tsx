@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import type { ClientGameState, Player, ResourceType } from "@catan/shared";
-import { RESOURCE_TYPES } from "@catan/shared";
+import { RESOURCE_TYPES, longestRoad } from "@catan/shared";
 import { useGameStore } from "../store.js";
 import { TipOfTheDay } from "./TipOfTheDay.js";
 import { TradePanel } from "./TradePanel.js";
@@ -135,33 +135,53 @@ function PlayerCard({ player, state }: { player: Player; state: ClientGameState 
             ))}
           </span>
         ))}
-        {/* Road count — hover highlights longest road on board */}
+
+        {/* Longest road chain — hover highlights it on the board */}
         <span
-          style={{ fontSize: 18, color: "#aaa", cursor: "pointer" }}
-          title="Hover to highlight longest road"
+          style={{ display: "flex", alignItems: "center", gap: 3, cursor: "pointer" }}
+          title="Longest road chain — hover to highlight on board"
           onMouseEnter={() => setHoveredRoadPlayer(player.id)}
           onMouseLeave={() => setHoveredRoadPlayer(null)}
         >
-          🛣️ <span style={{ fontSize: 14, fontWeight: "bold", verticalAlign: "middle" }}>{15 - player.remainingRoads}</span>
+          <span style={{ fontSize: 16 }}>🛣️</span>
+          <span style={{ fontSize: 13, color: "#aaa" }}>road</span>
+          <span style={{
+            fontSize: 15, fontWeight: "bold",
+            color: player.hasLongestRoad ? "#38bdf8" : "#ccc",
+            minWidth: 16, textAlign: "center",
+          }}>
+            {longestRoad(state as any, player.id)}
+          </span>
         </span>
-        <span style={{ fontSize: 18, color: "#aaa" }}>
-          🃏 <span style={{ fontSize: 14, fontWeight: "bold", verticalAlign: "middle" }}>{player.devCards.length}</span>
+
+        {/* Knights played */}
+        <span style={{ display: "flex", alignItems: "center", gap: 3 }} title="Knights played">
+          <span style={{ fontSize: 16 }}>⚔️</span>
+          <span style={{ fontSize: 13, color: "#aaa" }}>knights</span>
+          <span style={{
+            fontSize: 15, fontWeight: "bold",
+            color: player.hasLargestArmy ? "#c084fc" : "#ccc",
+            minWidth: 16, textAlign: "center",
+          }}>
+            {player.knightsPlayed}
+          </span>
         </span>
-        {/* Milestone badges */}
+
+        {/* Dev cards in hand */}
+        <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+          <span style={{ fontSize: 16 }}>🃏</span>
+          <span style={{ fontSize: 14, fontWeight: "bold", color: "#aaa" }}>{player.devCards.length}</span>
+        </span>
+
+        {/* Special card badges */}
         {player.hasLargestArmy && (
-          <span
-            title={`Largest Army (${player.knightsPlayed} knights)`}
-            style={{ fontSize: 13, background: "#7c3aed", color: "#fff", borderRadius: 5, padding: "2px 6px", fontWeight: "bold" }}
-          >
-            ⚔️ Army
+          <span style={{ fontSize: 12, background: "#7c3aed", color: "#fff", borderRadius: 5, padding: "2px 6px", fontWeight: "bold" }}>
+            ⚔️ Largest Army
           </span>
         )}
         {player.hasLongestRoad && (
-          <span
-            title="Longest Road"
-            style={{ fontSize: 13, background: "#0369a1", color: "#fff", borderRadius: 5, padding: "2px 6px", fontWeight: "bold" }}
-          >
-            🛣️ Road
+          <span style={{ fontSize: 12, background: "#0369a1", color: "#fff", borderRadius: 5, padding: "2px 6px", fontWeight: "bold" }}>
+            🛣️ Longest Road
           </span>
         )}
       </div>
