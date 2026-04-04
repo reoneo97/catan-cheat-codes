@@ -32,7 +32,11 @@ input {
 }
 input:focus { outline: none; border-color: #f0c040; }
 
-.app { min-height: 100vh; }
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
 .lobby {
   display: flex;
@@ -50,6 +54,31 @@ input:focus { outline: none; border-color: #f0c040; }
   width: 280px;
 }
 
+.room-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 12px 16px;
+  width: 320px;
+}
+.room-label {
+  font-size: 11px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+.room-id {
+  font-size: 28px;
+  font-weight: 700;
+  color: #f0c040;
+  letter-spacing: 0.04em;
+}
+.room-status {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
 .error-banner {
   background: #6b1a1a;
   color: #ff9999;
@@ -60,18 +89,30 @@ input:focus { outline: none; border-color: #f0c040; }
 }
 
 .game-layout {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 300px;
-  height: 100vh;
-  gap: 0;
 }
 
 .board-area {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
   overflow: hidden;
+  min-height: 0;
+  padding: 8px;
+}
+
+@keyframes hexFlipBack {
+  0%   { transform: scaleX(1); opacity: 1; }
+  45%  { transform: scaleX(0.01); opacity: 1; }
+  46%  { transform: scaleX(0.01); opacity: 0; }
+  100% { transform: scaleX(0.01); opacity: 0; }
+}
+
+@keyframes hexFlipFront {
+  0%   { transform: scaleX(0.01); opacity: 0; }
+  44%  { transform: scaleX(0.01); opacity: 0; }
+  45%  { transform: scaleX(0.01); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 1; }
 }
 
 .panel-area {
@@ -82,4 +123,31 @@ input:focus { outline: none; border-color: #f0c040; }
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+@keyframes diceShake {
+  0%   { transform: rotate(0deg) scale(1) translateY(0); }
+  15%  { transform: rotate(-18deg) scale(0.88) translateY(-6px); }
+  30%  { transform: rotate(15deg) scale(1.1) translateY(3px); }
+  45%  { transform: rotate(-12deg) scale(0.93) translateY(-3px); }
+  60%  { transform: rotate(8deg) scale(1.04) translateY(2px); }
+  80%  { transform: rotate(-3deg) scale(0.99); }
+  100% { transform: rotate(0deg) scale(1) translateY(0); }
+}
+.catan-die { transition: transform 0.1s; }
+.catan-die--rolling { animation: diceShake 0.65s ease-out; }
+
+@keyframes tilePulse {
+  0%   { opacity: 0; transform: scale(1); }
+  18%  { opacity: 1; transform: scale(1.04); }
+  45%  { opacity: 0.55; transform: scale(1); }
+  72%  { opacity: 0.9; transform: scale(1.04); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+@keyframes resourceFloat {
+  0%   { opacity: 0; transform: translateY(0) scale(0.7); }
+  18%  { opacity: 1; transform: translateY(-10px) scale(1.15); }
+  60%  { opacity: 1; transform: translateY(-26px) scale(1); }
+  100% { opacity: 0; transform: translateY(-52px) scale(0.9); }
 }
