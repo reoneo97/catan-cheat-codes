@@ -120,7 +120,9 @@ function PlayerCard({ player, state }: { player: Player; state: ClientGameState 
           {player.publicVP} VP
         </span>
       </div>
-      <ResourceHand resources={player.resources} isMe={isMe} />
+      <div data-player-resources={player.id}>
+        <ResourceHand resources={player.resources} isMe={isMe} />
+      </div>
       <div style={{ display: "flex", gap: 12, marginTop: 8, flexWrap: "wrap", alignItems: "center" }}>
         {[
           { emoji: "🏠", placed: 5 - player.remainingSettlements, total: 5 },

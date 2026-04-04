@@ -5,6 +5,7 @@ import { useGameStore } from "./store.js";
 import { BoardView } from "./components/Board.js";
 import { PlayerPanel } from "./components/PlayerPanel.js";
 import { TipOfTheDay } from "./components/TipOfTheDay.js";
+import { FlyingResourcesOverlay } from "./components/FlyingResourcesOverlay.js";
 import "./App.css";
 
 const PLAYER_COLOR: Record<string, string> = {
@@ -292,9 +293,12 @@ function RootPage() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<RootPage />} />
-      <Route path="/room/:roomId" element={<RoomPage />} />
-    </Routes>
+    <>
+      <FlyingResourcesOverlay />
+      <Routes>
+        <Route path="/" element={<RootPage />} />
+        <Route path="/room/:roomId" element={<RoomPage />} />
+      </Routes>
+    </>
   );
 }

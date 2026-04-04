@@ -7,6 +7,7 @@ import React, { useMemo, useEffect, useState, useRef } from "react";
 import type { Board, ClientGameState, CubeCoord, Port, Tile } from "@catan/shared";
 import { STANDARD_LAND_HEXES, hexCornerPixel, hexEdgeIds, hexToPixel, hexVertexIds, cubeKey, edgeVertices, edgeHexKeys, boardAdjacentEdges, canPlaceSettlement, canPlaceCity, canPlaceRoad, validInitialSettlementVertices, validInitialRoadEdges } from "@catan/shared";
 import { useGameStore } from "../store.js";
+import { triggerFlight } from "../flightBus.js";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
@@ -191,7 +192,7 @@ function PortMarker({ port }: { port: Port }) {
   );
 }
 
-function HexTile({ tile, onClick, animDelay, skipAnim, activated }: { tile: Tile; onClick?: () => void; animDelay: number; skipAnim: boolean; activated: boolean }) {
+function HexTile({ tile, onClick, animDelay, skipAnim, activated, robberTarget }: { tile: Tile; onClick?: () => void; animDelay: number; skipAnim: boolean; activated: boolean; robberTarget: boolean }) {
   const points = hexPolygonPoints(tile.coord);
   const center = hexCenter(tile.coord);
   const color = TERRAIN_COLOR[tile.terrain] ?? "#ccc";
@@ -261,21 +262,6 @@ function HexTile({ tile, onClick, animDelay, skipAnim, activated }: { tile: Tile
                   <circle key={i} cx={dotStartX + i * dotSpacing} cy={dotY} r={2.5} fill={dotColor} />
                 ))}
               </g>
-              {/* Resource emoji rises from tile when it produces */}
-              {activated && TERRAIN_LABEL[tile.terrain] && (
-                <text
-                  x={center.x} y={center.y - 10}
-                  textAnchor="middle" fontSize={26}
-                  style={{
-                    transformBox: "fill-box",
-                    transformOrigin: "center bottom",
-                    animation: "resourceRise 1.5s ease-out both",
-                    pointerEvents: "none",
-                  }}
-                >
-                  {TERRAIN_LABEL[tile.terrain]}
-                </text>
-              )}
             </g>
           );
         })()}
@@ -283,6 +269,18 @@ function HexTile({ tile, onClick, animDelay, skipAnim, activated }: { tile: Tile
           <g>
             <circle cx={center.x} cy={center.y + 22} r={16} fill="rgba(0,0,0,0.55)" />
             <text x={center.x} y={center.y + 22} textAnchor="middle" dominantBaseline="middle" fontSize={20}>🥷</text>
+          </g>
+        )}
+        {robberTarget && (
+          <g style={{ pointerEvents: "none" }}>
+            <polygon
+              points={points}
+              fill="rgba(231,76,60,0.18)"
+              stroke="#e74c3c"
+              strokeWidth={3}
+              strokeDasharray="6 4"
+              style={{ animation: "robberPulse 1.2s ease-in-out infinite" }}
+            />
           </g>
         )}
       </g>
@@ -319,7 +317,8 @@ export function BoardView({ state }: BoardProps) {
   const { board } = state;
   const { selectedVertexId, selectedEdgeId, selectVertex, selectEdge, sendAction, hoveredRoadPlayerId } = useGameStore();
 
-  // Tile pulse: highlight tiles whose number matches the roll after dice settle
+  // Tile pulse + resource flights after dice settle
+  const svgRef = useRef<SVGSVGElement>(null);
   const prevDiceKey = useRef("");
   const [activatedNumber, setActivatedNumber] = useState<number | null>(null);
   useEffect(() => {
@@ -328,7 +327,46 @@ export function BoardView({ state }: BoardProps) {
     if (key === prevDiceKey.current) return;
     prevDiceKey.current = key;
     const sum = state.dice[0] + state.dice[1];
-    const settle = setTimeout(() => setActivatedNumber(sum), 700);
+
+    const settle = setTimeout(() => {
+      setActivatedNumber(sum);
+
+      // Fire resource flights for every building on an activated tile
+      const svg = svgRef.current;
+      if (!svg) return;
+      const ctm = svg.getScreenCTM();
+      if (!ctm) return;
+
+      for (const tile of board.tiles) {
+        if (tile.number !== sum || !TERRAIN_LABEL[tile.terrain]) continue;
+
+        const c = hexCenter(tile.coord);
+        const pt = svg.createSVGPoint();
+        pt.x = c.x; pt.y = c.y;
+        const sp = pt.matrixTransform(ctm);
+
+        const owners = new Set<string>();
+        for (const vid of hexVertexIds(tile.coord)) {
+          const b = board.buildings[vid];
+          if (b) owners.add(b.playerId);
+        }
+
+        owners.forEach((ownerId) => {
+          const targetEl = document.querySelector(`[data-player-resources="${ownerId}"]`);
+          if (!targetEl) return;
+          const rect = targetEl.getBoundingClientRect();
+          triggerFlight({
+            id: `${cubeKey(tile.coord)}-${ownerId}-${Date.now()}-${Math.random()}`,
+            emoji: TERRAIN_LABEL[tile.terrain],
+            fromX: sp.x,
+            fromY: sp.y,
+            toX: rect.left + rect.width / 2,
+            toY: rect.top + rect.height / 2,
+          });
+        });
+      }
+    }, 700);
+
     const clear = setTimeout(() => setActivatedNumber(null), 2700);
     return () => { clearTimeout(settle); clearTimeout(clear); };
   }, [state.dice]);
@@ -458,6 +496,7 @@ export function BoardView({ state }: BoardProps) {
 
   return (
     <svg
+      ref={svgRef}
       viewBox={`${vx} ${vy} ${vw} ${vh}`}
       preserveAspectRatio="xMidYMid meet"
       style={{ width: "100%", height: "100%", display: "block", background: TERRAIN_COLOR.sea }}
@@ -484,20 +523,20 @@ export function BoardView({ state }: BoardProps) {
       {/* Animated sea wave overlay */}
       <rect x={vx} y={vy} width={vw} height={vh} fill="url(#sea-waves)" />
       {/* Tiles */}
-      {board.tiles.map((tile, index) => (
-        <HexTile
-          key={`${boardFingerprint}-${cubeKey(tile.coord)}`}
-          tile={tile}
-          animDelay={index * 60}
-          skipAnim={skipAnim}
-          activated={activatedNumber !== null && tile.number === activatedNumber}
-          onClick={
-            isMyTurn && turnPhase === "movingRobber" && tile.terrain !== "sea"
-              ? () => sendAction({ type: "moveRobber", coord: tile.coord })
-              : undefined
-          }
-        />
-      ))}
+      {board.tiles.map((tile, index) => {
+        const isRobberTarget = isMyTurn && turnPhase === "movingRobber" && tile.terrain !== "sea" && !tile.hasRobber;
+        return (
+          <HexTile
+            key={`${boardFingerprint}-${cubeKey(tile.coord)}`}
+            tile={tile}
+            animDelay={index * 60}
+            skipAnim={skipAnim}
+            activated={activatedNumber !== null && tile.number === activatedNumber}
+            robberTarget={isRobberTarget}
+            onClick={isRobberTarget ? () => sendAction({ type: "moveRobber", coord: tile.coord }) : undefined}
+          />
+        );
+      })}
 
       {/* Ports */}
       {board.ports.map((port, i) => (
