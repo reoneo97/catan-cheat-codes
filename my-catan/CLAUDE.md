@@ -50,9 +50,13 @@ packages/client/src/
   ├── socket.ts      Shared Socket.io client instance
   ├── store.ts       Zustand store — wires socket events to React state
   ├── App.tsx        Lobby → waiting room → game layout
+  ├── App.css        Global styles + CSS keyframe animations (hexFlip, diceShake, tilePulse, resourceFloat)
   └── components/
-        ├── Board.tsx       SVG board — hex tiles, vertices, edges, buildings, roads
-        └── PlayerPanel.tsx Player hands, action buttons, game log
+        ├── Board.tsx         SVG board — hex tiles, vertices, edges, buildings, roads
+        ├── PlayerPanel.tsx   Player hands, action buttons, game log
+        ├── DiceDisplay.tsx   Animated physical dice with pip dots
+        ├── DevCardPanel.tsx  Discard picker, steal picker, dev card hand
+        └── TradePanel.tsx    Bank trade + player-to-player trade UI
 ```
 
 **The engine lives in `shared/`** and runs on the server authoritatively. The server is the single source of truth — clients send actions, server validates and applies them, then broadcasts updated state to all players. Each player receives a personalised view (opponent dev card contents are hidden).
@@ -64,6 +68,8 @@ packages/client/src/
 **Vertex IDs:** Derived from the sorted cube keys of the 2–3 hexes that share the vertex. Canonical across all adjacent hexes.
 
 **Edge IDs:** Derived from the sorted cube keys of the 2 hexes sharing the edge.
+
+**Vertex-to-corner mapping:** `hexVertexIds` index `i` (0 = top, clockwise) maps to `hexCornerPixel` index `(i+5)%6` because `hexCornerPixel` starts at -30° (top-right). This offset is critical — all port, road, and building positions depend on it.
 
 **Game phases:**
 - `setup` — snake draft: players place 2 settlements + 2 roads each (reverse order for round 2)
@@ -87,12 +93,18 @@ packages/client/src/
 - [x] Player-to-player trade offers
 - [x] Victory point tracking + win condition (10 VP)
 - [x] Per-player hidden state (opponent dev cards masked)
+- [x] Discard UI, steal picker, dev card play UI (YoP/Monopoly pickers)
+- [x] Animated physical dice (pip dots, shake animation, ROBBER! label)
+- [x] Tile pulse animation on roll — tiles matching rolled number glow gold
+- [x] Resource gain floaters — `+N emoji` floats up in your player card on resource gain
+- [x] Valid placement highlighting — vertex/edge dots only shown on legal spots
+- [x] Largest army / longest road badges per player; hover road icon to highlight longest road on board
+- [x] Hex flip animation on new game; skipped on reconnect (fingerprint in localStorage)
+- [x] Radial-gradient terrain, number token shadows, pip dots, animated sea waves, round road caps
+- [x] Port markers: anchor + resource + ratio badge with dock planks from coast vertices
 
 ## What's not yet implemented (TODO)
 
-- [ ] Discard UI (the engine handles it; the client needs a card-picker modal)
-- [ ] Player trade response UI
-- [ ] Dev card play UI (year of plenty resource picker, monopoly picker)
 - [ ] Road rotation to align with actual hex edge angles in SVG
 - [ ] Reconnection handling (socket drops mid-game)
 - [ ] Game persistence (currently in-memory only)
