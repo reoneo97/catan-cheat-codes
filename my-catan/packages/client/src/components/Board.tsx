@@ -271,6 +271,22 @@ function HexTile({ tile, onClick, animDelay, skipAnim, activated, robberTarget }
             <text x={center.x} y={center.y + 22} textAnchor="middle" dominantBaseline="middle" fontSize={20}>🥷</text>
           </g>
         )}
+        {/* Red X rises when this tile's number is rolled but the robber blocks production */}
+        {activated && tile.hasRobber && (
+          <text
+            x={center.x} y={center.y - 5}
+            textAnchor="middle" dominantBaseline="middle"
+            fontSize={32} fontWeight="bold" fill="#e74c3c"
+            style={{
+              transformBox: "fill-box",
+              transformOrigin: "center bottom",
+              animation: "resourceRise 1.4s ease-out both",
+              pointerEvents: "none",
+            }}
+          >
+            ✕
+          </text>
+        )}
         {robberTarget && (
           <g style={{ pointerEvents: "none" }}>
             <polygon
@@ -338,7 +354,7 @@ export function BoardView({ state }: BoardProps) {
       if (!ctm) return;
 
       for (const tile of board.tiles) {
-        if (tile.number !== sum || !TERRAIN_LABEL[tile.terrain]) continue;
+        if (tile.number !== sum || !TERRAIN_LABEL[tile.terrain] || tile.hasRobber) continue;
 
         const c = hexCenter(tile.coord);
         const pt = svg.createSVGPoint();
