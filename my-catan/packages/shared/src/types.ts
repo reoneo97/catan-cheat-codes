@@ -161,7 +161,8 @@ export type Action =
   | { type: "acceptTrade"; partnerId: string }
   | { type: "cancelTrade" }
   | { type: "bankTrade"; give: ResourceType; want: ResourceType; amount: number }
-  | { type: "endTurn" };
+  | { type: "endTurn" }
+  | { type: "devGrant"; resource: ResourceType };
 
 // ── Game State ────────────────────────────────────────────────────────────────
 

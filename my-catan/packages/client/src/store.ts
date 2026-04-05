@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Action, ClientGameState, PlayerColor } from "@catan/shared";
+import type { Action, ClientGameState, PlayerColor } from "@hexlands/shared";
 import { socket } from "./socket.js";
 
 function getOrCreatePlayerId(): string {

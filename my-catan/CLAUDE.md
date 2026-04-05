@@ -34,29 +34,34 @@ Shared must be built before server/client since they import from it.
 ## Architecture
 
 ```
-colonist.io DOM (browser)
-  └── packages/shared/src/
-        ├── types.ts       All game types (GameState, Player, Action, Board…)
-        ├── hex.ts         Cube coordinate math, vertex/edge IDs, SVG pixel positions
-        ├── board.ts       Board generation — randomised tiles, number tokens, ports
-        ├── rules.ts       Move validation — pure functions, no side effects
-        └── engine.ts      applyAction(state, playerId, action) → GameState
+packages/shared/src/
+  ├── types.ts       All game types (GameState, Player, Action, Board…)
+  ├── hex.ts         Cube coordinate math, vertex/edge IDs, SVG pixel positions
+  ├── board.ts       Board generation — randomised tiles, number tokens, ports
+  ├── rules.ts       Move validation — pure functions, no side effects
+  └── engine.ts      applyAction(state, playerId, action) → GameState
 
 packages/server/src/
   ├── index.ts       Express + Socket.io server, socket event routing
   └── GameRoom.ts    Room/lobby management, per-player state filtering
 
 packages/client/src/
-  ├── socket.ts      Shared Socket.io client instance
+  ├── socket.ts      Shared Socket.io client instance (VITE_SERVER_URL env var)
   ├── store.ts       Zustand store — wires socket events to React state
-  ├── App.tsx        Lobby → waiting room → game layout
-  ├── App.css        Global styles + CSS keyframe animations (hexFlip, diceShake, tilePulse, resourceFloat)
+  ├── flightBus.ts   Pub/sub for flying resource animations (SVG→HTML coord conversion)
+  ├── App.tsx        Lobby → waiting room → game layout, routes: / /game /tutorial
+  ├── App.css        Global styles + CSS keyframe animations
   └── components/
-        ├── Board.tsx         SVG board — hex tiles, vertices, edges, buildings, roads
-        ├── PlayerPanel.tsx   Player hands, action buttons, game log
-        ├── DiceDisplay.tsx   Animated physical dice with pip dots
-        ├── DevCardPanel.tsx  Discard picker, steal picker, dev card hand
-        └── TradePanel.tsx    Bank trade + player-to-player trade UI
+        ├── Board.tsx              SVG board — tiles, buildings, roads, robber, overlays
+        ├── PlayerPanel.tsx        Sidebar — hands, actions, log, help, confirmations, DevTestPanel
+        ├── DiceDisplay.tsx        Animated physical dice with pip dots
+        ├── DevCardPanel.tsx       Dev card hand, SVG icons, play/discard/steal UI
+        ├── TradePanel.tsx         Bank trade + player-to-player trade UI
+        ├── HelpModal.tsx          In-game quick reference modal (costs, dev cards, trading)
+        ├── Tutorial.tsx           Full /tutorial page (all mechanics)
+        ├── TradeOfferOverlay.tsx  Active trade offers shown as board overlay
+        ├── FlyingResourcesOverlay.tsx  Flying resource card animations
+        └── TipOfTheDay.tsx        Rotating tips shown in sidebar
 ```
 
 **The engine lives in `shared/`** and runs on the server authoritatively. The server is the single source of truth — clients send actions, server validates and applies them, then broadcasts updated state to all players. Each player receives a personalised view (opponent dev card contents are hidden).
@@ -77,17 +82,24 @@ packages/client/src/
 - `ended` — winner determined
 
 **Socket events:**
-- Client → Server: `joinRoom`, `startGame`, `action`
+- Client → Server: `joinRoom`, `startGame`, `restartGame`, `action`
 - Server → Client: `gameState`, `gameStarted`, `playerJoined`, `playerLeft`, `error`
+
+**Environment variables:**
+- Server: `ALLOWED_ORIGIN` (CORS — defaults to `http://localhost:5173`)
+- Client: `VITE_SERVER_URL` (socket URL — defaults to `""` which uses Vite proxy)
 
 ## What's implemented
 
 - [x] Full board generation (randomised tiles, numbers, ports)
+- [x] Board fairness constraints — no two 6/8 adjacent, no two 2/12 adjacent (retry-based generation)
 - [x] Setup phase (snake draft, round-2 free resources)
 - [x] Dice rolling + resource distribution
-- [x] Robber on 7 (discard >7, move robber, steal)
+- [x] Robber on 7 (discard >7, move robber, steal) with interactive SVG targeting + blocked-building indicators
 - [x] Building: settlements, cities, roads
 - [x] Development cards: knight, road building, year of plenty, monopoly, VP cards
+- [x] Dev card SVG icons (shield+sword knight, +2 YoP, L-plank road building, coin monopoly, star VP)
+- [x] Newly bought dev cards show type + "next turn" badge; unplayable until next turn
 - [x] Largest army / longest road
 - [x] Bank trading (4:1 default, port ratios)
 - [x] Player-to-player trade offers
@@ -97,22 +109,40 @@ packages/client/src/
 - [x] Animated physical dice (pip dots, shake animation, ROBBER! label)
 - [x] Tile pulse animation on roll — tiles matching rolled number glow gold
 - [x] Resource gain floaters — `+N emoji` floats up in your player card on resource gain
+- [x] Flying resource card animations (flightBus.ts — SVG→HTML coordinate conversion)
 - [x] Valid placement highlighting — vertex/edge dots only shown on legal spots
 - [x] Largest army / longest road badges per player; hover road icon to highlight longest road on board
 - [x] Hex flip animation on new game; skipped on reconnect (fingerprint in localStorage)
 - [x] Radial-gradient terrain, number token shadows, pip dots, animated sea waves, round road caps
 - [x] Port markers: anchor + resource + ratio badge with dock planks from coast vertices
+- [x] Castle SVG icon for cities (two towers with battlements, bezier arch gate)
+- [x] In-game `?` help modal (building costs, dev card descriptions, trading summary)
+- [x] Restart / quit confirmation UI (two-step confirm before action)
+- [x] Last-player-wins: server sets winner if only one connected player remains
+- [x] Reconnection handling: server marks player disconnected, re-connects on same socket with same playerId
+- [x] Full tutorial page at `/tutorial`
+- [x] `devtest` room: resource grant panel in sidebar for testing (5 resource buttons, no second player needed)
+- [x] Deployment infrastructure: Dockerfile, fly.toml, GitHub Actions CI + deploy workflows
 
 ## What's not yet implemented (TODO)
 
 - [ ] Road rotation to align with actual hex edge angles in SVG
-- [ ] Reconnection handling (socket drops mid-game)
-- [ ] Game persistence (currently in-memory only)
+- [ ] Game persistence (currently in-memory only — server restart loses all games)
 - [ ] Spectator mode
 
 ## Adding a new action
 
 1. Add the action type to the `Action` union in `shared/src/types.ts`
 2. Add validation logic in `shared/src/rules.ts` (pure function)
-3. Handle the action in the `switch` in `shared/src/engine.ts` → `applyActionMut`
+3. Handle the action in `shared/src/engine.ts` → `applyActionMut`
+   - **Important:** If the action must bypass phase guards (e.g. dev/cheat actions like `devGrant`), handle it at the **very top** of `applyActionMut`, before any phase-based early returns. Otherwise the phase guard will throw "Invalid action" before your handler runs.
 4. Wire up the UI in the relevant client component
+
+## Deployment
+
+Frontend → Cloudflare Pages, backend → Fly.io.
+
+Set `VITE_SERVER_URL` in Cloudflare Pages build env to your Fly.io URL.
+Set `ALLOWED_ORIGIN` as a Fly.io secret to your Pages URL.
+
+`Dockerfile` and `fly.toml` are in `my-catan/`. GitHub Actions workflows are in `.github/workflows/`.

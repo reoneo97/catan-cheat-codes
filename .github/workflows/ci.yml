@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+    paths: ["my-catan/**"]
+  pull_request:
+    branches: [master]
+    paths: ["my-catan/**"]
+
+jobs:
+  build:
+    name: Type-check & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: my-catan
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: my-catan/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared
+        run: npm run build -w @catan/shared
+
+      - name: Build server
+        run: npm run build -w @catan/server
+
+      - name: Build client
+        run: npm run build -w @catan/client
+        env:
+          # Use a placeholder URL for CI — real URL is set in deploy workflow
+          VITE_SERVER_URL: https://catan-server-app.fly.dev

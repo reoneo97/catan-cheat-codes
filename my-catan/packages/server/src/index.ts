@@ -1,14 +1,18 @@
 import express from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import type { ClientToServerEvents, ServerToClientEvents } from "@catan/shared";
+import type { ClientToServerEvents, ServerToClientEvents } from "@hexlands/shared";
 import { GameRoom } from "./GameRoom.js";
 
 const app = express();
 const httpServer = createServer(app);
 
+// In production, set ALLOWED_ORIGIN to your Cloudflare Pages URL:
+//   fly secrets set ALLOWED_ORIGIN=https://your-app.pages.dev
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN ?? "http://localhost:5173";
+
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
-  cors: { origin: "*" },
+  cors: { origin: ALLOWED_ORIGIN },
   pingInterval: 5000,
   pingTimeout: 3000,
 });
@@ -19,11 +23,19 @@ app.get("/health", (_req, res) => res.json({ ok: true }));
 
 const rooms = new Map<string, GameRoom>();
 
-function getOrCreateRoom(roomId: string): GameRoom {
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, new GameRoom(roomId, io));
+async function getOrCreateRoom(roomId: string): Promise<GameRoom> {
+  if (rooms.has(roomId)) return rooms.get(roomId)!;
+
+  // Try to restore a persisted game from Redis
+  const restored = await GameRoom.load(roomId, io);
+  if (restored) {
+    rooms.set(roomId, restored);
+    return restored;
   }
-  return rooms.get(roomId)!;
+
+  const room = new GameRoom(roomId, io);
+  rooms.set(roomId, room);
+  return room;
 }
 
 // ── Socket handlers ───────────────────────────────────────────────────────────
@@ -33,13 +45,13 @@ io.on("connection", (socket) => {
 
   let currentRoomId: string | null = null;
 
-  socket.on("joinRoom", (roomId, playerName, playerId) => {
+  socket.on("joinRoom", async (roomId, playerName, playerId) => {
     if (!roomId || !playerName || !playerId) {
       socket.emit("error", "roomId, playerName and playerId are required");
       return;
     }
 
-    const room = getOrCreateRoom(roomId);
+    const room = await getOrCreateRoom(roomId);
     const result = room.addPlayer(socket, playerName, playerId);
 
     if (typeof result === "string") {

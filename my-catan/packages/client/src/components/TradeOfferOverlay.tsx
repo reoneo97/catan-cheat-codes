@@ -1,5 +1,5 @@
-import type { ClientGameState, ResourceType } from "@catan/shared";
-import { RESOURCE_TYPES } from "@catan/shared";
+import type { ClientGameState, ResourceType } from "@hexlands/shared";
+import { RESOURCE_TYPES } from "@hexlands/shared";
 import { useGameStore } from "../store.js";
 
 const EMOJI: Record<ResourceType, string> = {

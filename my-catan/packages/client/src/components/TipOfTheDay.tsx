@@ -26,12 +26,16 @@ export function TipOfTheDay() {
 
   return (
     <div style={{
-      fontSize: 12,
+      fontSize: 14,
       color: "#f0c040",
       fontStyle: "italic",
-      textAlign: "center",
-      padding: "6px 12px",
-      borderTop: "1px solid #30363d",
+      whiteSpace: "nowrap",
+      padding: "7px 18px",
+      background: "rgba(13, 17, 23, 0.72)",
+      border: "1px solid rgba(240, 192, 64, 0.25)",
+      borderRadius: 999,
+      backdropFilter: "blur(6px)",
+      boxShadow: "0 2px 12px rgba(0,0,0,0.45)",
       opacity: visible ? 1 : 0,
       transition: "opacity 0.4s ease",
     }}>

@@ -265,6 +265,13 @@ function syncPublicVP(state: GameState): void {
 function applyActionMut(state: GameState, playerId: string, action: Action): void {
   const cp = currentPlayer(state);
 
+  // ── Dev-only cheat actions (bypass all phase guards) ──────────────────────
+  if (action.type === "devGrant") {
+    const granter = state.players.find((p) => p.id === playerId);
+    if (granter) granter.resources[action.resource] = (granter.resources[action.resource] ?? 0) + 1;
+    return;
+  }
+
   // ── Setup phase ────────────────────────────────────────────────────────────
   if (state.phase === "setup") {
     if (action.type === "placeInitialSettlement") {

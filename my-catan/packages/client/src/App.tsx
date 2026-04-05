@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
-import type { ClientGameState } from "@catan/shared";
+import type { ClientGameState } from "@hexlands/shared";
 import { useGameStore } from "./store.js";
 import { BoardView } from "./components/Board.js";
 import { PlayerPanel } from "./components/PlayerPanel.js";
 import { TipOfTheDay } from "./components/TipOfTheDay.js";
 import { FlyingResourcesOverlay } from "./components/FlyingResourcesOverlay.js";
 import { TradeOfferOverlay } from "./components/TradeOfferOverlay.js";
+import { Tutorial } from "./components/Tutorial.js";
 import "./App.css";
 
 const PLAYER_COLOR: Record<string, string> = {
@@ -18,21 +19,21 @@ const PLAYER_COLOR: Record<string, string> = {
 function JoinForm({ defaultRoom }: { defaultRoom: string }) {
   const { join } = useGameStore();
   const navigate = useNavigate();
-  const [nameInput, setNameInput] = useState(() => localStorage.getItem("catan_name") ?? "");
+  const [nameInput, setNameInput] = useState(() => localStorage.getItem("hexlands_name") ?? "");
   const [roomInput, setRoomInput] = useState(defaultRoom);
 
   function handleJoin(e: React.FormEvent) {
     e.preventDefault();
     if (!nameInput || !roomInput) return;
-    localStorage.setItem("catan_name", nameInput);
-    localStorage.setItem("catan_room", roomInput);
+    localStorage.setItem("hexlands_name", nameInput);
+    localStorage.setItem("hexlands_room", roomInput);
     join(roomInput, nameInput);
     navigate(`/room/${roomInput}`, { replace: true });
   }
 
   return (
     <div className="lobby">
-      <h1>🏝️ Catan</h1>
+      <h1>🏝️ Hexlands</h1>
       <form onSubmit={handleJoin} className="lobby-form">
         <input
           placeholder="Your name"
@@ -48,6 +49,13 @@ function JoinForm({ defaultRoom }: { defaultRoom: string }) {
         />
         <button type="submit">Join Room</button>
       </form>
+      <button
+        type="button"
+        onClick={() => navigate("/tutorial")}
+        style={{ background: "transparent", color: "#f0c040", border: "1px solid #f0c04055", fontSize: 13, padding: "6px 14px" }}
+      >
+        📖 How to Play
+      </button>
     </div>
   );
 }
@@ -62,7 +70,7 @@ function WaitingRoom() {
 
   function handleLeave() {
     leave();
-    localStorage.removeItem("catan_room");
+    localStorage.removeItem("hexlands_room");
     navigate("/", { replace: true });
   }
 
@@ -74,7 +82,7 @@ function WaitingRoom() {
 
   return (
     <div className="lobby">
-      <h1>🏝️ Catan</h1>
+      <h1>🏝️ Hexlands</h1>
 
       <div className="room-card">
         <div className="room-label">Room</div>
@@ -84,7 +92,7 @@ function WaitingRoom() {
         </div>
       </div>
 
-      <div className="room-card" style={{ width: "100%" }}>
+      <div className="room-card">
         <div className="room-label">Invite link</div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4 }}>
           <code style={{ flex: 1, fontSize: 12, color: "#aaa", wordBreak: "break-all" }}>{shareUrl}</code>
@@ -94,7 +102,7 @@ function WaitingRoom() {
         </div>
       </div>
 
-      <div className="room-card" style={{ width: "100%" }}>
+      <div className="room-card">
         <div className="room-label">Players ({waitingPlayers.length} / 4)</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
           {waitingPlayers.map((p) => (
@@ -111,12 +119,19 @@ function WaitingRoom() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+      <div style={{ display: "flex", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
         <button onClick={handleLeave} style={{ background: "#30363d", color: "#ccc" }}>
           ← Exit
         </button>
         <button onClick={startGame} disabled={waitingPlayers.length < 2}>
           Start Game
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate("/tutorial")}
+          style={{ background: "transparent", color: "#f0c040", border: "1px solid #f0c04055", fontSize: 13 }}
+        >
+          📖 How to Play
         </button>
       </div>
 
@@ -193,8 +208,8 @@ function RoomPage() {
   const { join, leave, gameState, roomId, connected, error, clearError } = useGameStore();
   const navigate = useNavigate();
 
-  const savedName = localStorage.getItem("catan_name");
-  const savedRoom = localStorage.getItem("catan_room");
+  const savedName = localStorage.getItem("hexlands_name");
+  const savedRoom = localStorage.getItem("hexlands_room");
   const isJoined = !!roomId;
 
   // Auto-join if we have credentials for this room
@@ -246,6 +261,16 @@ function RoomPage() {
           <div className="board-area">
             <BoardView state={gameState} />
             {gameState.tradeOffer && <TradeOfferOverlay state={gameState} />}
+            <div style={{
+              position: "absolute",
+              top: 14,
+              left: "50%",
+              transform: "translateX(-50%)",
+              pointerEvents: "none",
+              zIndex: 10,
+            }}>
+              <TipOfTheDay />
+            </div>
           </div>
           <div className="panel-area">
             <PlayerPanel state={gameState} />
@@ -276,8 +301,8 @@ function RootPage() {
 
   // Restore session if we have saved credentials
   useEffect(() => {
-    const savedName = localStorage.getItem("catan_name");
-    const savedRoom = localStorage.getItem("catan_room");
+    const savedName = localStorage.getItem("hexlands_name");
+    const savedRoom = localStorage.getItem("hexlands_room");
     if (savedName && savedRoom) {
       navigate(`/room/${savedRoom}`, { replace: true });
     }
@@ -300,6 +325,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<RootPage />} />
         <Route path="/room/:roomId" element={<RoomPage />} />
+        <Route path="/tutorial" element={<Tutorial />} />
       </Routes>
     </>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import type { ClientGameState } from "@catan/shared";
+import type { ClientGameState } from "@hexlands/shared";
 
 // Pip [x%, y%] positions for each die face
 const PIPS: Record<number, Array<[number, number]>> = {

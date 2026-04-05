@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import type { ClientGameState, DevCardType, ResourceType } from "@catan/shared";
-import { RESOURCE_TYPES, hexVertexIds } from "@catan/shared";
+import type { ClientGameState, DevCardType, ResourceType } from "@hexlands/shared";
+import { RESOURCE_TYPES, hexVertexIds } from "@hexlands/shared";
 import { useGameStore } from "../store.js";
 
 // ── Shared constants ──────────────────────────────────────────────────────────
@@ -18,12 +18,89 @@ const PLAYER_COLOR: Record<string, string> = {
 };
 
 const DEV_LABEL: Record<DevCardType, string> = {
-  knight: "⚔️ Knight",
-  roadBuilding: "🛣️ Road Building",
-  yearOfPlenty: "🌟 Year of Plenty",
-  monopoly: "💰 Monopoly",
-  victoryPoint: "⭐ VP",
+  knight: "Knight",
+  roadBuilding: "Road Building",
+  yearOfPlenty: "Year of Plenty",
+  monopoly: "Monopoly",
+  victoryPoint: "VP",
 };
+
+// ── Dev card SVG icons ────────────────────────────────────────────────────────
+
+function KnightIcon({ size = 18 }: { size?: number }) {
+  // Purple shield with sword diagonal across it
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" style={{ display: "inline-block", verticalAlign: "middle", flexShrink: 0 }}>
+      {/* Shield */}
+      <path d="M10,1 L17,4 L17,11 Q17,16 10,18.5 Q3,16 3,11 L3,4 Z"
+        fill="#7c3aed" stroke="rgba(255,255,255,0.35)" strokeWidth="1.2" />
+      {/* Sword blade */}
+      <line x1="5" y1="15.5" x2="16" y2="4.5" stroke="white" strokeWidth="2.2" strokeLinecap="round" />
+      {/* Crossguard */}
+      <line x1="13" y1="6.5" x2="16.5" y2="10" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
+      {/* Pommel */}
+      <circle cx="5" cy="16" r="1.6" fill="rgba(255,255,255,0.85)" />
+    </svg>
+  );
+}
+
+function YearOfPlentyIcon({ size = 18 }: { size?: number }) {
+  // Green circle with bold "+2"
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" style={{ display: "inline-block", verticalAlign: "middle", flexShrink: 0 }}>
+      <circle cx="10" cy="10" r="9" fill="#27ae60" stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
+      <text x="10" y="14.5" textAnchor="middle" fontSize="9" fontWeight="bold" fill="white"
+        fontFamily="-apple-system, BlinkMacSystemFont, sans-serif">+2</text>
+    </svg>
+  );
+}
+
+function RoadBuildingIcon({ size = 18 }: { size?: number }) {
+  // Two road planks forming a corner (L-shape)
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" style={{ display: "inline-block", verticalAlign: "middle", flexShrink: 0 }}>
+      {/* Horizontal plank */}
+      <rect x="1" y="12" width="12" height="5" rx="2" fill="#2980b9" />
+      {/* Vertical plank */}
+      <rect x="11" y="3" width="5" height="12" rx="2" fill="#3498db" />
+      {/* Corner join */}
+      <rect x="11" y="12" width="5" height="5" rx="2" fill="#1f6fa3" />
+    </svg>
+  );
+}
+
+function MonopolyIcon({ size = 18 }: { size?: number }) {
+  // Orange coin with an outward arrow (taking from all)
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" style={{ display: "inline-block", verticalAlign: "middle", flexShrink: 0 }}>
+      <circle cx="10" cy="10" r="9" fill="#e67e22" stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
+      {/* Arrow pointing outward (down-left) — taking */}
+      <line x1="12" y1="7" x2="6" y2="13" stroke="white" strokeWidth="2" strokeLinecap="round" />
+      <polyline points="6,9 6,13 10,13" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function VictoryPointIcon({ size = 18 }: { size?: number }) {
+  // 5-pointed gold star
+  return (
+    <svg width={size} height={size} viewBox="0 0 20 20" style={{ display: "inline-block", verticalAlign: "middle", flexShrink: 0 }}>
+      <polygon
+        points="10,1.5 12.6,7.3 18.8,7.6 14.2,11.9 15.9,18.1 10,14.5 4.1,18.1 5.8,11.9 1.2,7.6 7.4,7.3"
+        fill="#f0c040" stroke="rgba(180,130,0,0.6)" strokeWidth="0.8"
+      />
+    </svg>
+  );
+}
+
+function DevCardIcon({ card, size = 16 }: { card: DevCardType; size?: number }) {
+  if (card === "knight") return <KnightIcon size={size} />;
+  if (card === "yearOfPlenty") return <YearOfPlentyIcon size={size} />;
+  if (card === "roadBuilding") return <RoadBuildingIcon size={size} />;
+  if (card === "monopoly") return <MonopolyIcon size={size} />;
+  if (card === "victoryPoint") return <VictoryPointIcon size={size} />;
+  return null;
+}
 
 function btnStyle(enabled: boolean): React.CSSProperties {
   return {
@@ -154,8 +231,8 @@ function StealPanel({ state }: { state: ClientGameState }) {
 
   return (
     <div style={{ border: "1px solid #f0c040", borderRadius: 8, padding: 10, background: "rgba(240,192,64,0.06)" }}>
-      <div style={{ fontSize: 12, color: "#f0c040", fontWeight: "bold", marginBottom: 8 }}>
-        🗡️ Choose who to steal from:
+      <div style={{ fontSize: 12, color: "#f0c040", fontWeight: "bold", marginBottom: 8, display: "flex", alignItems: "center", gap: 5 }}>
+        <KnightIcon size={14} /> Choose who to steal from:
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         {victims.map((p) => (
@@ -237,17 +314,37 @@ function DevCardHand({ state }: { state: ClientGameState }) {
                 color: canPlay ? "#eee" : "#444",
                 borderRadius: 6, padding: "4px 9px", fontSize: 12,
                 cursor: canPlay ? "pointer" : "default", minWidth: "unset",
+                display: "flex", alignItems: "center", gap: 5,
+                opacity: canPlay ? 1 : 0.45,
               }}
             >
+              <DevCardIcon card={card} size={15} />
               {DEV_LABEL[card]}{count > 1 ? ` ×${count}` : ""}
             </button>
           );
         })}
-        {newCount > 0 && (
-          <span style={{ fontSize: 12, color: "#555", padding: "4px 9px", border: "1px solid #222", borderRadius: 6 }}>
-            🆕 ×{newCount} (next turn)
-          </span>
-        )}
+        {me.devCardsBoughtThisTurn.map((card, i) => (
+          <div
+            key={`new-${i}`}
+            title="Bought this turn — playable from next turn"
+            style={{
+              background: "#0d1117",
+              border: "1px dashed #333",
+              borderRadius: 6, padding: "4px 9px", fontSize: 12,
+              display: "flex", alignItems: "center", gap: 5,
+              opacity: 0.55, cursor: "default",
+            }}
+          >
+            <DevCardIcon card={card} size={15} />
+            <span style={{ color: "#888" }}>{DEV_LABEL[card]}</span>
+            <span style={{
+              fontSize: 9, background: "#1e2530", color: "#666",
+              borderRadius: 3, padding: "1px 5px", lineHeight: 1.5,
+            }}>
+              next turn
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* Year of Plenty picker */}
@@ -273,9 +370,10 @@ function DevCardHand({ state }: { state: ClientGameState }) {
             <button
               disabled={!yopRes1 || !yopRes2}
               onClick={playYoP}
-              style={{ flex: 1, background: "#f0c040", color: "#1a1a1a" }}
+              style={{ flex: 1, background: "#f0c040", color: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
             >
-              🌟 Take {yopRes1 ? EMOJI[yopRes1] : "?"} + {yopRes2 ? EMOJI[yopRes2] : "?"}
+              <YearOfPlentyIcon size={15} />
+              Take {yopRes1 ? EMOJI[yopRes1] : "?"} + {yopRes2 ? EMOJI[yopRes2] : "?"}
             </button>
             <button onClick={() => { setPending(null); setYopRes1(null); setYopRes2(null); }} style={{ background: "#30363d", color: "#aaa" }}>
               Cancel
@@ -299,9 +397,10 @@ function DevCardHand({ state }: { state: ClientGameState }) {
             <button
               disabled={!monoRes}
               onClick={playMono}
-              style={{ flex: 1, background: "#f0c040", color: "#1a1a1a" }}
+              style={{ flex: 1, background: "#f0c040", color: "#1a1a1a", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}
             >
-              💰 Monopolize {monoRes ? EMOJI[monoRes] : "?"}
+              <MonopolyIcon size={15} />
+              Monopolize {monoRes ? EMOJI[monoRes] : "?"}
             </button>
             <button onClick={() => { setPending(null); setMonoRes(null); }} style={{ background: "#30363d", color: "#aaa" }}>
               Cancel

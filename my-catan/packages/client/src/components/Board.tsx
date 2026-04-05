@@ -4,8 +4,8 @@
  */
 
 import React, { useMemo, useEffect, useState, useRef } from "react";
-import type { Board, ClientGameState, CubeCoord, Port, Tile } from "@catan/shared";
-import { STANDARD_LAND_HEXES, hexCornerPixel, hexEdgeIds, hexToPixel, hexVertexIds, cubeKey, edgeVertices, edgeHexKeys, boardAdjacentEdges, canPlaceSettlement, canPlaceCity, canPlaceRoad, validInitialSettlementVertices, validInitialRoadEdges } from "@catan/shared";
+import type { Board, ClientGameState, CubeCoord, Port, Tile } from "@hexlands/shared";
+import { STANDARD_LAND_HEXES, hexCornerPixel, hexEdgeIds, hexToPixel, hexVertexIds, cubeKey, edgeVertices, edgeHexKeys, boardAdjacentEdges, canPlaceSettlement, canPlaceCity, canPlaceRoad, validInitialSettlementVertices, validInitialRoadEdges } from "@hexlands/shared";
 import { useGameStore } from "../store.js";
 import { triggerFlight } from "../flightBus.js";
 
@@ -192,7 +192,7 @@ function PortMarker({ port }: { port: Port }) {
   );
 }
 
-function HexTile({ tile, onClick, animDelay, skipAnim, activated, robberTarget }: { tile: Tile; onClick?: () => void; animDelay: number; skipAnim: boolean; activated: boolean; robberTarget: boolean }) {
+function HexTile({ tile, onClick, animDelay, skipAnim, activated }: { tile: Tile; onClick?: () => void; animDelay: number; skipAnim: boolean; activated: boolean }) {
   const points = hexPolygonPoints(tile.coord);
   const center = hexCenter(tile.coord);
   const color = TERRAIN_COLOR[tile.terrain] ?? "#ccc";
@@ -286,18 +286,6 @@ function HexTile({ tile, onClick, animDelay, skipAnim, activated, robberTarget }
           >
             ✕
           </text>
-        )}
-        {robberTarget && (
-          <g style={{ pointerEvents: "none" }}>
-            <polygon
-              points={points}
-              fill="rgba(231,76,60,0.18)"
-              stroke="#e74c3c"
-              strokeWidth={3}
-              strokeDasharray="6 4"
-              style={{ animation: "robberPulse 1.2s ease-in-out infinite" }}
-            />
-          </g>
         )}
       </g>
     </g>
@@ -393,6 +381,12 @@ export function BoardView({ state }: BoardProps) {
     state.players.map((p) => [p.id, PLAYER_COLOR[p.color] ?? "#999"])
   );
   const turnPhase = state.turnPhase;
+
+  // Robber placement — two-step: select tile then confirm
+  const [selectedRobberCoord, setSelectedRobberCoord] = useState<CubeCoord | null>(null);
+  useEffect(() => {
+    if (turnPhase !== "movingRobber") setSelectedRobberCoord(null);
+  }, [turnPhase]);
 
   // Collect all unique vertex IDs on the board
   const allVertexIds = new Set<string>();
@@ -504,11 +498,13 @@ export function BoardView({ state }: BoardProps) {
   });
   const xs = allCorners.map((p) => p.x);
   const ys = allCorners.map((p) => p.y);
-  const PAD = 55;
-  const vx = Math.min(...xs) - PAD;
-  const vy = Math.min(...ys) - PAD;
-  const vw = Math.max(...xs) - vx + PAD * 2;
-  const vh = Math.max(...ys) - vy + PAD * 2;
+  const PAD_H = 55;
+  const PAD_TOP = 75;   // extra water above to push hexes down
+  const PAD_BOTTOM = 35;
+  const vx = Math.min(...xs) - PAD_H;
+  const vy = Math.min(...ys) - PAD_TOP;
+  const vw = Math.max(...xs) - vx + PAD_H * 2;
+  const vh = Math.max(...ys) - vy + PAD_BOTTOM;
 
   return (
     <svg
@@ -548,11 +544,31 @@ export function BoardView({ state }: BoardProps) {
             animDelay={index * 60}
             skipAnim={skipAnim}
             activated={activatedNumber !== null && tile.number === activatedNumber}
-            robberTarget={isRobberTarget}
-            onClick={isRobberTarget ? () => sendAction({ type: "moveRobber", coord: tile.coord }) : undefined}
+            onClick={isRobberTarget ? () => setSelectedRobberCoord(tile.coord) : undefined}
           />
         );
       })}
+
+      {/* Robber placement circles — one per valid target tile */}
+      {isMyTurn && turnPhase === "movingRobber" && board.tiles
+        .filter((tile) => tile.terrain !== "sea" && !tile.hasRobber)
+        .map((tile) => {
+          const c = hexCenter(tile.coord);
+          const key = cubeKey(tile.coord);
+          const isSelected = selectedRobberCoord !== null && cubeKey(selectedRobberCoord) === key;
+          return (
+            <circle
+              key={key}
+              cx={c.x} cy={c.y} r={isSelected ? 18 : 14}
+              fill={isSelected ? "rgba(255,255,255,0.7)" : "rgba(255,255,255,0.3)"}
+              stroke={isSelected ? "#fff" : "rgba(255,255,255,0.6)"}
+              strokeWidth={2}
+              style={{ cursor: "pointer" }}
+              onClick={() => setSelectedRobberCoord(tile.coord)}
+            />
+          );
+        })
+      }
 
       {/* Ports */}
       {board.ports.map((port, i) => (
@@ -614,18 +630,21 @@ export function BoardView({ state }: BoardProps) {
         return (
           <g key={vid} onClick={() => handleVertexClick(vid)} style={{ cursor: isMyTurn ? "pointer" : "default" }}>
             {building ? (
-              <polygon
-                points={
-                  building.type === "city"
-                    // Castle: two crenellated towers flanking a lower centre wall
-                    ? `${pos.x-12},${pos.y+8} ${pos.x-12},${pos.y-4} ${pos.x-8},${pos.y-4} ${pos.x-8},${pos.y-13} ${pos.x-3},${pos.y-13} ${pos.x-3},${pos.y-4} ${pos.x+3},${pos.y-4} ${pos.x+3},${pos.y-13} ${pos.x+8},${pos.y-13} ${pos.x+8},${pos.y-4} ${pos.x+12},${pos.y-4} ${pos.x+12},${pos.y+8}`
-                    // House: peaked roof + rectangular walls
-                    : `${pos.x},${pos.y-12} ${pos.x+9},${pos.y-3} ${pos.x+9},${pos.y+7} ${pos.x-9},${pos.y+7} ${pos.x-9},${pos.y-3}`
-                }
-                fill={playerColors[building.playerId] ?? "#999"}
-                stroke="#fff"
-                strokeWidth={1.5}
-              />
+              building.type === "city" ? (
+                <path
+                  d={`M ${pos.x-13},${pos.y+9} L ${pos.x-13},${pos.y-13} L ${pos.x-10},${pos.y-13} L ${pos.x-10},${pos.y-3} L ${pos.x-7},${pos.y-3} L ${pos.x-7},${pos.y-13} L ${pos.x-4},${pos.y-13} L ${pos.x-4},${pos.y-1} L ${pos.x-4},${pos.y-8} L ${pos.x-1},${pos.y-8} L ${pos.x-1},${pos.y-1} L ${pos.x+1},${pos.y-1} L ${pos.x+1},${pos.y-8} L ${pos.x+4},${pos.y-8} L ${pos.x+4},${pos.y-1} L ${pos.x+4},${pos.y-3} L ${pos.x+4},${pos.y-13} L ${pos.x+7},${pos.y-13} L ${pos.x+7},${pos.y-3} L ${pos.x+10},${pos.y-3} L ${pos.x+10},${pos.y-13} L ${pos.x+13},${pos.y-13} L ${pos.x+13},${pos.y+9} L ${pos.x+2.5},${pos.y+9} L ${pos.x+2.5},${pos.y+4} Q ${pos.x},${pos.y+1} ${pos.x-2.5},${pos.y+4} L ${pos.x-2.5},${pos.y+9} Z`}
+                  fill={playerColors[building.playerId] ?? "#999"}
+                  stroke="#fff"
+                  strokeWidth={1.5}
+                />
+              ) : (
+                <polygon
+                  points={`${pos.x},${pos.y-12} ${pos.x+9},${pos.y-3} ${pos.x+9},${pos.y+7} ${pos.x-9},${pos.y+7} ${pos.x-9},${pos.y-3}`}
+                  fill={playerColors[building.playerId] ?? "#999"}
+                  stroke="#fff"
+                  strokeWidth={1.5}
+                />
+              )
             ) : validVertexIds.has(vid) ? (
               <circle
                 cx={pos.x}
@@ -640,6 +659,21 @@ export function BoardView({ state }: BoardProps) {
         );
       })}
 
+      {/* Robber-blocked building indicators — semi-transparent ✕ over each building on the selected tile */}
+      {selectedRobberCoord && hexVertexIds(selectedRobberCoord).flatMap((vid) => {
+        const building = board.buildings[vid];
+        if (!building) return [];
+        const bpos = vertexPixel(vid);
+        if (!bpos) return [];
+        const S = 8;
+        return [(
+          <g key={`robber-block-${vid}`} pointerEvents="none">
+            <line x1={bpos.x - S} y1={bpos.y - S} x2={bpos.x + S} y2={bpos.y + S} stroke="#e74c3c" strokeWidth={3} strokeLinecap="round" opacity={0.8} />
+            <line x1={bpos.x + S} y1={bpos.y - S} x2={bpos.x - S} y2={bpos.y + S} stroke="#e74c3c" strokeWidth={3} strokeLinecap="round" opacity={0.8} />
+          </g>
+        )];
+      })}
+
       {/* Vertex confirmation */}
       {selectedVertexId && (() => {
         const pos = vertexPixel(selectedVertexId);
@@ -652,6 +686,21 @@ export function BoardView({ state }: BoardProps) {
         const ep = edgeEndpoints(selectedEdgeId);
         if (!ep) return null;
         return <ConfirmAction pos={ep.mid} onConfirm={confirmEdge} onCancel={() => selectEdge(null)} />;
+      })()}
+
+      {/* Robber placement confirmation */}
+      {selectedRobberCoord && (() => {
+        const c = hexCenter(selectedRobberCoord);
+        return (
+          <ConfirmAction
+            pos={c}
+            onConfirm={() => {
+              sendAction({ type: "moveRobber", coord: selectedRobberCoord });
+              setSelectedRobberCoord(null);
+            }}
+            onCancel={() => setSelectedRobberCoord(null)}
+          />
+        );
       })()}
     </svg>
   );

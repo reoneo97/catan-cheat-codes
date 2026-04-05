@@ -45,6 +45,7 @@ input:focus { outline: none; border-color: #f0c040; }
   justify-content: center;
   min-height: 100vh;
   gap: 16px;
+  padding: 32px 16px;
 }
 .lobby h1 { font-size: 40px; color: #f0c040; }
 .lobby-form {
@@ -59,7 +60,8 @@ input:focus { outline: none; border-color: #f0c040; }
   border: 1px solid #30363d;
   border-radius: 8px;
   padding: 12px 16px;
-  width: 320px;
+  width: 380px;
+  max-width: 100%;
 }
 .room-label {
   font-size: 11px;
@@ -94,6 +96,7 @@ input:focus { outline: none; border-color: #f0c040; }
   display: grid;
   grid-template-columns: 1fr 300px;
 }
+
 
 .board-area {
   position: relative;
@@ -151,11 +154,6 @@ input:focus { outline: none; border-color: #f0c040; }
   15%  { opacity: 1; transform: translateY(-14px) scale(1.35); }
   65%  { opacity: 0.9; transform: translateY(-52px) scale(1.1); }
   100% { opacity: 0; transform: translateY(-88px) scale(0.9); }
-}
-
-@keyframes robberPulse {
-  0%, 100% { opacity: 0.5; }
-  50%       { opacity: 1; }
 }
 
 @keyframes resourceFloat {

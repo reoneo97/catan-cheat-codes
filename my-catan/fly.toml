@@ -1,0 +1,35 @@
+# fly.toml — Fly.io configuration for the Catan game server
+# Run `fly launch` once to create the app, then `fly deploy` for subsequent deploys.
+# Replace "catan-server-app" with your actual app name from `fly launch`.
+
+app = "catan-server-app"
+primary_region = "sin"
+
+[build]
+  # Build context is the my-catan/ directory (run `fly deploy` from there)
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3001"
+  NODE_ENV = "production"
+  # Set ALLOWED_ORIGIN to your Cloudflare Pages URL via `fly secrets set`
+  # fly secrets set ALLOWED_ORIGIN=https://your-app.pages.dev
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "5s"
+    interval = "30s"
+    method = "GET"
+    path = "/health"
+    timeout = "5s"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

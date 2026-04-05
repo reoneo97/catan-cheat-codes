@@ -1,6 +1,7 @@
-import type { Action, ClientGameState, GameState, PlayerColor } from "@catan/shared";
-import { applyAction, createGame, PLAYER_COLORS } from "@catan/shared";
+import type { Action, ClientGameState, GameState, PlayerColor } from "@hexlands/shared";
+import { applyAction, createGame, PLAYER_COLORS } from "@hexlands/shared";
 import type { Server, Socket } from "socket.io";
+import { loadRoom, saveRoom } from "./redis.js";
 
 interface RoomPlayer {
   id: string;
@@ -71,6 +72,17 @@ export class GameRoom {
     if (this.state) {
       const p = this.state.players.find((p) => p.id === player.id);
       if (p) p.connected = false;
+
+      // If the game is still active and only one player remains connected, they win
+      if (this.state.phase !== "ended") {
+        const connected = this.state.players.filter((p) => p.connected);
+        if (connected.length === 1) {
+          this.state.winnerId = connected[0].id;
+          this.state.phase = "ended";
+          this.state.log.push(`${connected[0].name} wins — all other players disconnected!`);
+        }
+      }
+
       this.broadcast();
     } else {
       this.players = this.players.filter((p) => p.socketId !== socketId);
@@ -126,6 +138,25 @@ export class GameRoom {
       const clientState = this.toClientState(this.state, roomPlayer.id);
       this.io.to(roomPlayer.socketId).emit("gameState", clientState);
     }
+
+    // Fire-and-forget persistence — errors are logged inside saveRoom
+    saveRoom(this.id, {
+      state: this.state,
+      players: this.players.map(({ id, name, color }) => ({ id, name, color })),
+    }).catch(() => undefined);
+  }
+
+  /** Restore a room from Redis. Returns null if nothing stored. */
+  static async load(roomId: string, io: Server): Promise<GameRoom | null> {
+    const data = await loadRoom(roomId) as { state: GameState; players: Array<{ id: string; name: string; color: PlayerColor }> } | null;
+    if (!data?.state || !data?.players) return null;
+
+    const room = new GameRoom(roomId, io);
+    room.state = data.state;
+    // socketIds are session-specific — they'll be filled in as players reconnect
+    room.players = data.players.map((p) => ({ ...p, socketId: "" }));
+    console.log(`  [redis] restored room ${roomId} (${room.players.length} players, phase=${data.state.phase})`);
+    return room;
   }
 
   /** Strip hidden information for the receiving player. */
