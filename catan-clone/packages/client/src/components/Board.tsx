@@ -4,7 +4,7 @@
  */
 
 import type { ClientGameState, CubeCoord, Tile } from "@catan/shared";
-import { STANDARD_LAND_HEXES, hexCornerPixel, hexEdgeIds, hexToPixel, hexVertexIds, cubeKey, edgeVertices, edgeHexKeys } from "@catan/shared";
+import { hexCornerPixel, hexEdgeIds, hexToPixel, hexVertexIds, cubeKey, edgeVertices, edgeHexKeys } from "@catan/shared";
 import { useGameStore } from "../store.js";
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -55,9 +55,8 @@ function hexPolygonPoints(coord: CubeCoord): string {
   }).join(" ");
 }
 
-function vertexPixel(vertexId: string): { x: number; y: number } | null {
-  // Find a hex that contains this vertex and get its corner position
-  for (const coord of STANDARD_LAND_HEXES) {
+function vertexPixel(vertexId: string, landHexes: CubeCoord[]): { x: number; y: number } | null {
+  for (const coord of landHexes) {
     const vIds = hexVertexIds(coord);
     const idx = vIds.indexOf(vertexId);
     if (idx === -1) continue;
@@ -72,19 +71,13 @@ function parseHexKey(k: string): CubeCoord {
   return { q, r, s };
 }
 
-function edgeEndpoints(edgeId: string): [{ x: number; y: number }, { x: number; y: number }] | null {
+function edgeEndpoints(edgeId: string, landHexes: CubeCoord[]): [{ x: number; y: number }, { x: number; y: number }] | null {
   const [h1Key, h2Key] = edgeHexKeys(edgeId);
   const [v1Id, v2Id] = edgeVertices(parseHexKey(h1Key), parseHexKey(h2Key));
-  const p1 = vertexPixel(v1Id);
-  const p2 = vertexPixel(v2Id);
+  const p1 = vertexPixel(v1Id, landHexes);
+  const p2 = vertexPixel(v2Id, landHexes);
   if (!p1 || !p2) return null;
   return [p1, p2];
-}
-
-function edgeMidpoint(edgeId: string): { x: number; y: number } | null {
-  const pts = edgeEndpoints(edgeId);
-  if (!pts) return null;
-  return { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -143,10 +136,10 @@ export function BoardView({ state }: BoardProps) {
   const isMyTurn = state.players[state.currentPlayerIndex]?.id === myId;
   const turnPhase = state.turnPhase;
 
-  // Collect all unique vertex IDs on the board
+  // Derive vertex/edge sets from the board's own landHexes (layout-agnostic)
   const allVertexIds = new Set<string>();
   const allEdgeIds = new Set<string>();
-  for (const hex of STANDARD_LAND_HEXES) {
+  for (const hex of board.landHexes) {
     hexVertexIds(hex).forEach((v) => allVertexIds.add(v));
     hexEdgeIds(hex).forEach((e) => allEdgeIds.add(e));
   }
@@ -196,7 +189,7 @@ export function BoardView({ state }: BoardProps) {
 
       {/* Edges (roads + clickable areas) */}
       {Array.from(allEdgeIds).map((eid) => {
-        const pts = edgeEndpoints(eid);
+        const pts = edgeEndpoints(eid, board.landHexes);
         const mid = pts ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : null;
         if (!pts || !mid) return null;
         const road = board.roads[eid];
@@ -231,7 +224,7 @@ export function BoardView({ state }: BoardProps) {
 
       {/* Vertices (settlements/cities + clickable areas) */}
       {Array.from(allVertexIds).map((vid) => {
-        const pos = vertexPixel(vid);
+        const pos = vertexPixel(vid, board.landHexes);
         if (!pos) return null;
         const building = board.buildings[vid];
         const isSelected = selectedVertexId === vid;

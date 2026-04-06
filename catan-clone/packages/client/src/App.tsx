@@ -1,11 +1,12 @@
 import { useState } from "react";
+import { LAYOUTS } from "@catan/shared";
 import { useGameStore } from "./store.js";
 import { BoardView } from "./components/Board.js";
 import { PlayerPanel } from "./components/PlayerPanel.js";
 import "./App.css";
 
 function Lobby() {
-  const { join, startGame, connected, gameStarted, playerName, roomId } = useGameStore();
+  const { join, startGame, setLayout, connected, gameStarted, playerName, roomId, selectedLayoutId } = useGameStore();
   const [nameInput, setNameInput] = useState("");
   const [roomInput, setRoomInput] = useState("");
   const [joined, setJoined] = useState(false);
@@ -53,8 +54,42 @@ function Lobby() {
         <button onClick={startGame} style={{ marginTop: 16 }}>
           Start Game
         </button>
-        <p style={{ fontSize: 12, color: "#888", marginTop: 8 }}>
-          Share the room ID with friends. Need 2–4 players.
+        <div style={{ marginTop: 16 }}>
+          <p style={{ fontSize: 12, color: "#aaa", marginBottom: 6 }}>Map layout:</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {Object.values(LAYOUTS).map((layout) => (
+              <label
+                key={layout.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  border: `1px solid ${selectedLayoutId === layout.id ? "#f0c040" : "#30363d"}`,
+                  background: selectedLayoutId === layout.id ? "rgba(240,192,64,0.08)" : "transparent",
+                }}
+              >
+                <input
+                  type="radio"
+                  name="layout"
+                  value={layout.id}
+                  checked={selectedLayoutId === layout.id}
+                  onChange={() => setLayout(layout.id)}
+                />
+                <span>
+                  <strong style={{ color: "#e0e0e0" }}>{layout.label}</strong>
+                  <span style={{ color: "#888", fontSize: 11, marginLeft: 8 }}>
+                    {layout.players.min}–{layout.players.max} players · {layout.landHexes.length} hexes
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>
+        <p style={{ fontSize: 12, color: "#888", marginTop: 12 }}>
+          Share the room ID with friends.
         </p>
       </div>
     );

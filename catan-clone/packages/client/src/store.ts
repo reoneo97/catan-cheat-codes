@@ -9,6 +9,9 @@ interface GameStore {
   connected: boolean;
   error: string | null;
 
+  // Lobby
+  selectedLayoutId: string;
+
   // Game
   gameState: ClientGameState | null;
   gameStarted: boolean;
@@ -19,6 +22,7 @@ interface GameStore {
 
   // Actions
   join: (roomId: string, name: string) => void;
+  setLayout: (layoutId: string) => void;
   startGame: () => void;
   sendAction: (action: Action) => void;
   selectVertex: (id: string | null) => void;
@@ -32,6 +36,7 @@ export const useGameStore = create<GameStore>((set, get) => {
   socket.on("disconnect", () => set({ connected: false }));
   socket.on("gameState", (state) => set({ gameState: state }));
   socket.on("gameStarted", () => set({ gameStarted: true }));
+  socket.on("layoutChanged", (layoutId) => set({ selectedLayoutId: layoutId }));
   socket.on("error", (msg) => set({ error: msg }));
 
   return {
@@ -39,6 +44,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     playerName: "",
     connected: false,
     error: null,
+    selectedLayoutId: "standard",
     gameState: null,
     gameStarted: false,
     selectedVertexId: null,
@@ -48,6 +54,11 @@ export const useGameStore = create<GameStore>((set, get) => {
       set({ roomId, playerName });
       socket.connect();
       socket.emit("joinRoom", roomId, playerName);
+    },
+
+    setLayout(layoutId) {
+      set({ selectedLayoutId: layoutId });
+      socket.emit("setLayout", layoutId);
     },
 
     startGame() {

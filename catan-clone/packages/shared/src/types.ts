@@ -71,6 +71,51 @@ export interface Board {
   buildings: Record<VertexId, Building>;
   roads: Record<EdgeId, Road>;
   ports: Port[];
+  /** The land hex coords for this board — drives all adjacency queries. */
+  landHexes: CubeCoord[];
+}
+
+// ── Board Layouts ─────────────────────────────────────────────────────────────
+
+/**
+ * A port definition in human-editable form.
+ * Reference a coastal hex by coord, then specify which two vertex indices
+ * (0–5, clockwise from top) face the sea.
+ */
+export interface PortDef {
+  hex: CubeCoord;
+  vertexIndices: [number, number];
+  resource: PortResource;
+}
+
+/**
+ * A board layout is pure declarative data — no logic, no code.
+ * Add a new layout by creating a new object conforming to this interface.
+ */
+export interface BoardLayout {
+  /** Unique identifier used to select the layout. */
+  id: string;
+  /** Human-readable display name shown in the lobby. */
+  label: string;
+  /** Recommended player count range. */
+  players: { min: number; max: number };
+  /**
+   * Cube coordinates of every land hex, laid out in rows for readability.
+   * Order matters: terrainDistribution[i] is assigned to landHexes[i].
+   */
+  landHexes: CubeCoord[];
+  /**
+   * Terrain types to shuffle and assign to landHexes.
+   * Must have the same length as landHexes.
+   */
+  terrainDistribution: TerrainType[];
+  /**
+   * Number tokens to shuffle and assign to non-desert tiles.
+   * Must have length === (number of non-desert tiles).
+   */
+  numberDistribution: number[];
+  /** Port locations. */
+  ports: PortDef[];
 }
 
 // ── Development Cards ─────────────────────────────────────────────────────────
@@ -167,6 +212,7 @@ export type Action =
 
 export interface GameState {
   id: string;
+  layoutId: string;
   phase: GamePhase;
   turnPhase: TurnPhase;
   players: Player[];
@@ -200,11 +246,13 @@ export interface ServerToClientEvents {
   error: (message: string) => void;
   playerJoined: (player: { id: string; name: string; color: PlayerColor }) => void;
   playerLeft: (playerId: string) => void;
+  layoutChanged: (layoutId: string) => void;
   gameStarted: () => void;
 }
 
 export interface ClientToServerEvents {
   joinRoom: (roomId: string, playerName: string) => void;
+  setLayout: (layoutId: string) => void;
   startGame: () => void;
   action: (action: Action) => void;
 }
