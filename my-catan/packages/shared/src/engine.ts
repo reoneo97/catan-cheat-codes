@@ -9,6 +9,7 @@ import type {
   Action,
   CubeCoord,
   DevCardType,
+  GameHistory,
   GameState,
   Player,
   ResourceType,
@@ -104,6 +105,14 @@ function log(state: GameState, message: string): void {
   if (state.log.length > 200) state.log.shift();
 }
 
+function pushSnapshot(state: GameState): void {
+  const gained: Record<string, number> = {};
+  for (const p of state.players) {
+    gained[p.id] = RESOURCE_TYPES.reduce((s, r) => s + (p.stats.resourcesGained[r] ?? 0), 0);
+  }
+  state.history.snapshots.push({ turn: state.turnNumber, gained });
+}
+
 // ── Update longest road / largest army ───────────────────────────────────────
 
 function updateLongestRoad(state: GameState): void {
@@ -189,6 +198,7 @@ function distributeResources(state: GameState, roll: number): void {
       if (available > 0) {
         player.resources[resource] += available;
         state.bank[resource] -= available;
+        player.stats.resourcesGained[resource] += available;
         log(state, `${player.name} receives ${available}x ${resource}`);
       }
     }
@@ -220,6 +230,7 @@ function advanceSetup(state: GameState): void {
         (p) => p.id === setupOrder[0]
       );
       log(state, "Setup complete! Game begins.");
+      pushSnapshot(state); // turn 0 baseline
       return;
     }
   }
@@ -295,6 +306,7 @@ function applyActionMut(state: GameState, playerId: string, action: Action): voi
           if (RESOURCE_TYPES.includes(resource) && state.bank[resource] > 0) {
             cp.resources[resource]++;
             state.bank[resource]--;
+            cp.stats.resourcesGained[resource]++;
             log(state, `${cp.name} receives 1x ${resource} (setup)`);
           }
         }
@@ -453,8 +465,10 @@ function applyActionMut(state: GameState, playerId: string, action: Action): voi
 
       subtractResources(cp.resources, BUILDING_COSTS.settlement);
       addResources(state.bank, BUILDING_COSTS.settlement);
+      addResources(cp.stats.resourcesSpent, BUILDING_COSTS.settlement);
       state.board.buildings[action.vertexId] = { playerId, type: "settlement" };
       cp.remainingSettlements--;
+      state.history.buildEvents.push({ turn: state.turnNumber, playerId, building: "settlement" });
       log(state, `${cp.name} builds a settlement`);
       updateLongestRoad(state);
       checkWinner(state);
@@ -469,9 +483,11 @@ function applyActionMut(state: GameState, playerId: string, action: Action): voi
 
       subtractResources(cp.resources, BUILDING_COSTS.city);
       addResources(state.bank, BUILDING_COSTS.city);
+      addResources(cp.stats.resourcesSpent, BUILDING_COSTS.city);
       state.board.buildings[action.vertexId] = { playerId, type: "city" };
       cp.remainingCities--;
       cp.remainingSettlements++;
+      state.history.buildEvents.push({ turn: state.turnNumber, playerId, building: "city" });
       log(state, `${cp.name} builds a city`);
       checkWinner(state);
       break;
@@ -490,6 +506,7 @@ function applyActionMut(state: GameState, playerId: string, action: Action): voi
         assert(hasResources(cp, BUILDING_COSTS.road), "Not enough resources");
         subtractResources(cp.resources, BUILDING_COSTS.road);
         addResources(state.bank, BUILDING_COSTS.road);
+        addResources(cp.stats.resourcesSpent, BUILDING_COSTS.road);
       }
 
       state.board.roads[action.edgeId] = { playerId };
@@ -514,6 +531,8 @@ function applyActionMut(state: GameState, playerId: string, action: Action): voi
 
       subtractResources(cp.resources, BUILDING_COSTS.devCard);
       addResources(state.bank, BUILDING_COSTS.devCard);
+      addResources(cp.stats.resourcesSpent, BUILDING_COSTS.devCard);
+      cp.stats.devCardsDrawn++;
       const card = state.devCardDeck.pop()!;
       cp.devCardsBoughtThisTurn.push(card);
       log(state, `${cp.name} buys a development card`);
@@ -644,6 +663,9 @@ function applyActionMut(state: GameState, playerId: string, action: Action): voi
       cp.devCards.push(...cp.devCardsBoughtThisTurn);
       cp.devCardsBoughtThisTurn = [];
 
+      pushSnapshot(state); // snapshot at current turnNumber before advancing
+      state.turnNumber++;
+
       state.dice = null;
       state.currentPlayerIndex = (state.currentPlayerIndex + 1) % state.players.length;
       state.turnPhase = "preRoll";
@@ -668,6 +690,8 @@ function stealFrom(state: GameState, thief: Player, victim: Player): void {
   const resource = available[Math.floor(Math.random() * available.length)];
   victim.resources[resource]--;
   thief.resources[resource]++;
+  thief.stats.stolenByMe++;
+  victim.stats.stolenFromMe++;
   log(state, `${thief.name} steals 1 resource from ${victim.name}`);
 }
 
@@ -680,9 +704,18 @@ export function createGame(
   const emptyResources = (): Resources =>
     ({ wood: 0, brick: 0, wheat: 0, ore: 0, sheep: 0 });
 
+  const emptyStats = () => ({
+    resourcesGained: emptyResources(),
+    resourcesSpent: emptyResources(),
+    stolenFromMe: 0,
+    stolenByMe: 0,
+    devCardsDrawn: 0,
+  });
+
   const gamePlayers: Player[] = players.map((p) => ({
     ...p,
     resources: emptyResources(),
+    stats: emptyStats(),
     devCards: [],
     devCardsPlayed: [],
     devCardsBoughtThisTurn: [],
@@ -719,5 +752,7 @@ export function createGame(
     setupIndex: 0,
     setupRound: 1,
     lastSetupSettlementVertex: null,
+    turnNumber: 0,
+    history: { snapshots: [], buildEvents: [] },
   };
 }

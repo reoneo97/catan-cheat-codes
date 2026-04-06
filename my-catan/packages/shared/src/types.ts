@@ -95,11 +95,20 @@ export const DEV_CARD_COUNTS: Record<DevCardType, number> = {
 export type PlayerColor = "red" | "blue" | "green" | "orange";
 export const PLAYER_COLORS: PlayerColor[] = ["red", "blue", "green", "orange"];
 
+export interface PlayerStats {
+  resourcesGained: Resources;
+  resourcesSpent: Resources;
+  stolenFromMe: number;
+  stolenByMe: number;
+  devCardsDrawn: number;
+}
+
 export interface Player {
   id: string;
   name: string;
   color: PlayerColor;
   resources: Resources;
+  stats: PlayerStats;
   /** Cards in hand (hidden from others). */
   devCards: DevCardType[];
   /** Cards played this turn or previous turns (public). */
@@ -164,6 +173,15 @@ export type Action =
   | { type: "endTurn" }
   | { type: "devGrant"; resource: ResourceType };
 
+// ── Game History ─────────────────────────────────────────────────────────────
+
+export interface GameHistory {
+  /** One entry per endTurn (and one at setup completion). gained[playerId] = cumulative total. */
+  snapshots: Array<{ turn: number; gained: Record<string, number> }>;
+  /** Settlement and city placements, for badge overlays on the chart. */
+  buildEvents: Array<{ turn: number; playerId: string; building: "settlement" | "city" }>;
+}
+
 // ── Game State ────────────────────────────────────────────────────────────────
 
 export interface GameState {
@@ -192,9 +210,21 @@ export interface GameState {
   setupRound: 1 | 2;
   /** Vertex of last-placed settlement in round 2 (for free resource). */
   lastSetupSettlementVertex: VertexId | null;
+  /** Monotonically incrementing turn counter (increments on each endTurn). */
+  turnNumber: number;
+  /** Per-turn resource accumulation + build events, used for the victory screen chart. */
+  history: GameHistory;
 }
 
 // ── Socket Events ─────────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  playerId: string;
+  name: string;
+  color: PlayerColor;
+  message: string;
+  timestamp: number;
+}
 
 export interface ServerToClientEvents {
   gameState: (state: ClientGameState) => void;
@@ -202,6 +232,7 @@ export interface ServerToClientEvents {
   playerJoined: (player: { id: string; name: string; color: PlayerColor }) => void;
   playerLeft: (playerId: string) => void;
   gameStarted: () => void;
+  chatMessage: (msg: ChatMessage) => void;
 }
 
 export interface ClientToServerEvents {
@@ -209,6 +240,7 @@ export interface ClientToServerEvents {
   startGame: () => void;
   restartGame: () => void;
   action: (action: Action) => void;
+  sendChat: (message: string) => void;
 }
 
 /**

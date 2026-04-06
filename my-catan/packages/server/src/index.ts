@@ -117,6 +117,21 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("sendChat", (message) => {
+    if (!currentRoomId) return;
+    const room = rooms.get(currentRoomId);
+    if (!room) return;
+    const chatPlayer = room.getPlayerBySocket(socket.id);
+    if (!chatPlayer) return;
+    io.to(currentRoomId).emit("chatMessage", {
+      playerId: chatPlayer.id,
+      name: chatPlayer.name,
+      color: chatPlayer.color,
+      message: String(message).slice(0, 200),
+      timestamp: Date.now(),
+    });
+  });
+
   socket.on("disconnect", () => {
     console.log(`[-] ${socket.id} disconnected`);
     if (currentRoomId) {

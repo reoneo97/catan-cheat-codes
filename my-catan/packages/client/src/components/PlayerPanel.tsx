@@ -7,6 +7,7 @@ import { TradePanel } from "./TradePanel.js";
 import { DevCardPanel } from "./DevCardPanel.js";
 import { DiceDisplay } from "./DiceDisplay.js";
 import { HelpModal } from "./HelpModal.js";
+import { ChatPanel } from "./ChatPanel.js";
 
 const RESOURCE_EMOJI_MAP: Record<ResourceType, string> = {
   wood: "🌲", brick: "🧱", wheat: "🌾", ore: "⛰️", sheep: "🐑",
@@ -356,7 +357,7 @@ export function PlayerPanel({ state }: { state: ClientGameState }) {
           background: "rgba(0,0,0,0.3)",
           borderRadius: 6,
           padding: 8,
-          maxHeight: 160,
+          maxHeight: 120,
           overflowY: "auto",
           fontSize: 11,
           color: "#ccc",
@@ -367,6 +368,8 @@ export function PlayerPanel({ state }: { state: ClientGameState }) {
           <div key={i}>{entry}</div>
         ))}
       </div>
+
+      <ChatPanel />
     </div>
   );
 }

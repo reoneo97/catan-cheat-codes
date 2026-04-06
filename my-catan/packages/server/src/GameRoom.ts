@@ -29,6 +29,11 @@ export class GameRoom {
     return this.players.map((p) => ({ id: p.id, name: p.name, color: p.color }));
   }
 
+  getPlayerBySocket(socketId: string): { id: string; name: string; color: PlayerColor } | undefined {
+    const p = this.players.find((p) => p.socketId === socketId);
+    return p ? { id: p.id, name: p.name, color: p.color } : undefined;
+  }
+
   get hasStarted(): boolean {
     return this.state !== null;
   }
@@ -161,12 +166,13 @@ export class GameRoom {
 
   /** Strip hidden information for the receiving player. */
   private toClientState(state: GameState, forPlayerId: string): ClientGameState {
+    const gameEnded = state.phase === "ended";
     return {
       ...state,
       devCardDeckSize: state.devCardDeck.length,
       myPlayerId: forPlayerId,
       players: state.players.map((p) => {
-        if (p.id === forPlayerId) return p;
+        if (p.id === forPlayerId || gameEnded) return p;
         // Hide dev card contents from other players (keep count only)
         return {
           ...p,
