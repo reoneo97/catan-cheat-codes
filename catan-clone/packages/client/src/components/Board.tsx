@@ -3,7 +3,7 @@
  * Click handlers for vertex/edge selection are wired into the store.
  */
 
-import type { Board, ClientGameState, CubeCoord, Tile } from "@catan/shared";
+import type { ClientGameState, CubeCoord, Tile } from "@catan/shared";
 import { STANDARD_LAND_HEXES, hexCornerPixel, hexEdgeIds, hexToPixel, hexVertexIds, cubeKey, edgeVertices, edgeHexKeys } from "@catan/shared";
 import { useGameStore } from "../store.js";
 
@@ -67,16 +67,24 @@ function vertexPixel(vertexId: string): { x: number; y: number } | null {
   return null;
 }
 
-function edgeMidpoint(edgeId: string): { x: number; y: number } | null {
+function parseHexKey(k: string): CubeCoord {
+  const [q, r, s] = k.split(",").map(Number);
+  return { q, r, s };
+}
+
+function edgeEndpoints(edgeId: string): [{ x: number; y: number }, { x: number; y: number }] | null {
   const [h1Key, h2Key] = edgeHexKeys(edgeId);
-  const parse = (k: string) => { const [q,r,s] = k.split(",").map(Number); return {q,r,s}; };
-  const c1 = parse(h1Key);
-  const c2 = parse(h2Key);
-  let [v1Id, v2Id] = edgeVertices(c1, c2);
+  const [v1Id, v2Id] = edgeVertices(parseHexKey(h1Key), parseHexKey(h2Key));
   const p1 = vertexPixel(v1Id);
   const p2 = vertexPixel(v2Id);
   if (!p1 || !p2) return null;
-  return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+  return [p1, p2];
+}
+
+function edgeMidpoint(edgeId: string): { x: number; y: number } | null {
+  const pts = edgeEndpoints(edgeId);
+  if (!pts) return null;
+  return { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -188,23 +196,24 @@ export function BoardView({ state }: BoardProps) {
 
       {/* Edges (roads + clickable areas) */}
       {Array.from(allEdgeIds).map((eid) => {
-        const mid = edgeMidpoint(eid);
-        if (!mid) return null;
+        const pts = edgeEndpoints(eid);
+        const mid = pts ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : null;
+        if (!pts || !mid) return null;
         const road = board.roads[eid];
         const isSelected = selectedEdgeId === eid;
 
         return (
           <g key={eid} onClick={() => handleEdgeClick(eid)} style={{ cursor: isMyTurn ? "pointer" : "default" }}>
             {road ? (
+              // Draw along actual edge geometry — stable across re-renders
               <line
-                x1={mid.x - 15}
-                y1={mid.y}
-                x2={mid.x + 15}
-                y2={mid.y}
+                x1={pts[0].x}
+                y1={pts[0].y}
+                x2={pts[1].x}
+                y2={pts[1].y}
                 stroke={PLAYER_COLOR[road.playerId] ?? "#999"}
                 strokeWidth={6}
                 strokeLinecap="round"
-                transform={`rotate(${Math.random() * 60 - 30}, ${mid.x}, ${mid.y})`}
               />
             ) : (
               <circle

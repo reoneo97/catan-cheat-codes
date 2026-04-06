@@ -106,8 +106,8 @@ export function canPlaceRoad(
   const coord1: CubeCoord = { q: h1[0], r: h1[1], s: h1[2] };
   const coord2: CubeCoord = { q: h2[0], r: h2[1], s: h2[2] };
 
-  // Both hexes must be land (to keep roads on the board)
-  if (!isLandHex(coord1) && !isLandHex(coord2)) return false;
+  // Both hexes must be land — roads cannot be placed on coastal edges
+  if (!isLandHex(coord1) || !isLandHex(coord2)) return false;
 
   const [v1, v2] = edgeVertices(coord1, coord2);
 

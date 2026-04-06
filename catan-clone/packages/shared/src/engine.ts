@@ -113,11 +113,9 @@ function updateLongestRoad(state: GameState): void {
 
     if (road >= LONGEST_ROAD_MIN) {
       if (!currentHolder) {
-        if (road >= LONGEST_ROAD_MIN) {
-          state.longestRoadPlayerId = player.id;
-          player.hasLongestRoad = true;
-          log(state, `${player.name} takes Longest Road!`);
-        }
+        state.longestRoadPlayerId = player.id;
+        player.hasLongestRoad = true;
+        log(state, `${player.name} takes Longest Road!`);
       } else if (currentHolder !== player.id) {
         const holderRoad = longestRoad(state, currentHolder);
         if (road > holderRoad) {
@@ -364,6 +362,12 @@ function applyActionMut(state: GameState, playerId: string, action: Action): voi
       const newKey = cubeKey(action.coord);
       const isLand = LAND_COORDS.some((c) => cubeKey(c) === newKey);
       assert(isLand, "Robber must be placed on a land tile");
+
+      const currentRobberTile = state.board.tiles.find((t) => t.hasRobber);
+      assert(
+        !currentRobberTile || cubeKey(currentRobberTile.coord) !== newKey,
+        "Robber must move to a different tile"
+      );
 
       // Remove from current location
       const current = state.board.tiles.find((t) => t.hasRobber);

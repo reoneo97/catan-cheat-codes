@@ -96,9 +96,13 @@ export class GameRoom {
 
   /** Strip hidden information for the receiving player. */
   private toClientState(state: GameState, forPlayerId: string): ClientGameState {
+    // Destructure devCardDeck out so it is never sent over the wire.
+    // Spreading `state` directly would include it at runtime even though
+    // ClientGameState omits it at the type level.
+    const { devCardDeck, ...rest } = state;
     return {
-      ...state,
-      devCardDeckSize: state.devCardDeck.length,
+      ...rest,
+      devCardDeckSize: devCardDeck.length,
       myPlayerId: forPlayerId,
       players: state.players.map((p) => {
         if (p.id === forPlayerId) return p;
