@@ -3,6 +3,7 @@ import { LAYOUTS } from "@catan/shared";
 import { useGameStore } from "./store.js";
 import { BoardView } from "./components/Board.js";
 import { PlayerPanel } from "./components/PlayerPanel.js";
+import { useSoundEffects } from "./hooks/useSoundEffects.js";
 import "./App.css";
 
 function Lobby() {
@@ -100,6 +101,10 @@ function Lobby() {
 
 export default function App() {
   const { gameState, error, clearError } = useGameStore();
+
+  // Plays sounds by diffing previous vs current game state.
+  // The server never sends sound instructions — this hook handles it all.
+  useSoundEffects(gameState);
 
   return (
     <div className="app">

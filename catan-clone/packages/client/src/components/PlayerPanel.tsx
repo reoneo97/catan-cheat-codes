@@ -1,6 +1,8 @@
+import { useState } from "react";
 import type { ClientGameState, Player, ResourceType } from "@catan/shared";
 import { RESOURCE_TYPES } from "@catan/shared";
 import { useGameStore } from "../store.js";
+import { sounds } from "../sounds.js";
 
 const RESOURCE_EMOJI: Record<ResourceType, string> = {
   wood: "🌲", brick: "🧱", wheat: "🌾", ore: "⛰️", sheep: "🐑",
@@ -65,14 +67,30 @@ function PlayerCard({ player, state }: { player: Player; state: ClientGameState 
 export function PlayerPanel({ state }: { state: ClientGameState }) {
   const { sendAction } = useGameStore();
   const myId = state.myPlayerId;
-  const me = state.players.find((p) => p.id === myId);
   const isMyTurn = state.players[state.currentPlayerIndex]?.id === myId;
+  const [muted, setMuted] = useState(false);
 
   const needsDiscard =
     state.turnPhase === "discarding" && state.pendingDiscards[myId] !== undefined;
 
+  function toggleMute() {
+    sounds.muted = !sounds.muted;
+    setMuted(sounds.muted);
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* Mute toggle */}
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button
+          onClick={toggleMute}
+          title={muted ? "Unmute sounds" : "Mute sounds"}
+          style={{ background: "transparent", color: "#aaa", fontSize: 18, padding: "2px 6px" }}
+        >
+          {muted ? "🔇" : "🔊"}
+        </button>
+      </div>
+
       {state.players.map((p) => (
         <PlayerCard key={p.id} player={p} state={state} />
       ))}
