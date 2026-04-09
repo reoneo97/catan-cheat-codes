@@ -1,0 +1,164 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #0d1117;
+  color: #e0e0e0;
+  min-height: 100vh;
+}
+
+button {
+  background: #f0c040;
+  color: #1a1a1a;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+button:hover { background: #f5d070; }
+button:disabled { background: #555; color: #888; cursor: not-allowed; }
+
+input {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #e0e0e0;
+  padding: 8px 12px;
+  font-size: 14px;
+  width: 100%;
+}
+input:focus { outline: none; border-color: #f0c040; }
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.lobby {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  gap: 16px;
+  padding: 32px 16px;
+}
+.lobby h1 { font-size: 40px; color: #f0c040; }
+.lobby-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 280px;
+}
+
+.room-card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 12px 16px;
+  width: 380px;
+  max-width: 100%;
+}
+.room-label {
+  font-size: 11px;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+.room-id {
+  font-size: 28px;
+  font-weight: 700;
+  color: #f0c040;
+  letter-spacing: 0.04em;
+}
+.room-status {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.error-banner {
+  background: #6b1a1a;
+  color: #ff9999;
+  padding: 10px 16px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.game-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 300px;
+}
+
+
+.board-area {
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+  padding: 8px;
+}
+
+@keyframes hexFlipBack {
+  0%   { transform: scaleX(1); opacity: 1; }
+  45%  { transform: scaleX(0.01); opacity: 1; }
+  46%  { transform: scaleX(0.01); opacity: 0; }
+  100% { transform: scaleX(0.01); opacity: 0; }
+}
+
+@keyframes hexFlipFront {
+  0%   { transform: scaleX(0.01); opacity: 0; }
+  44%  { transform: scaleX(0.01); opacity: 0; }
+  45%  { transform: scaleX(0.01); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 1; }
+}
+
+.panel-area {
+  background: #161b22;
+  border-left: 1px solid #30363d;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@keyframes diceShake {
+  0%   { transform: rotate(0deg) scale(1) translateY(0); }
+  15%  { transform: rotate(-18deg) scale(0.88) translateY(-6px); }
+  30%  { transform: rotate(15deg) scale(1.1) translateY(3px); }
+  45%  { transform: rotate(-12deg) scale(0.93) translateY(-3px); }
+  60%  { transform: rotate(8deg) scale(1.04) translateY(2px); }
+  80%  { transform: rotate(-3deg) scale(0.99); }
+  100% { transform: rotate(0deg) scale(1) translateY(0); }
+}
+.catan-die { transition: transform 0.1s; }
+.catan-die--rolling { animation: diceShake 0.65s ease-out; }
+
+@keyframes tokenGlow {
+  0%   { opacity: 0; transform: scale(1); }
+  20%  { opacity: 1; transform: scale(1.18); }
+  50%  { opacity: 0.65; transform: scale(1.08); }
+  78%  { opacity: 1; transform: scale(1.15); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+@keyframes resourceRise {
+  0%   { opacity: 0; transform: translateY(0) scale(0.5); }
+  15%  { opacity: 1; transform: translateY(-14px) scale(1.35); }
+  65%  { opacity: 0.9; transform: translateY(-52px) scale(1.1); }
+  100% { opacity: 0; transform: translateY(-88px) scale(0.9); }
+}
+
+@keyframes resourceFloat {
+  0%   { opacity: 0; transform: translateY(0) scale(0.7); }
+  18%  { opacity: 1; transform: translateY(-10px) scale(1.15); }
+  60%  { opacity: 1; transform: translateY(-26px) scale(1); }
+  100% { opacity: 0; transform: translateY(-52px) scale(0.9); }
+}

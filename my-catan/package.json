@@ -1,0 +1,14 @@
+{
+  "name": "hexlands",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev -w @hexlands/server\" \"npm run dev -w @hexlands/client\"",
+    "build": "npm run build -w @hexlands/shared && npm run build -w @hexlands/server && npm run build -w @hexlands/client",
+    "test": "npm run test -w @hexlands/shared && npm run build -w @hexlands/shared && npm run test -w @hexlands/server"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5.5.4"
+  }
+}
