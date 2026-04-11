@@ -26,6 +26,7 @@ interface GameStore {
 
   // Lobby
   waitingPlayers: WaitingPlayer[];
+  selectedLayoutId: string;
 
   // Game
   gameState: ClientGameState | null;
@@ -42,6 +43,7 @@ interface GameStore {
   // Actions
   join: (roomId: string, name: string) => void;
   leave: () => void;
+  setLayout: (layoutId: string) => void;
   startGame: () => void;
   sendAction: (action: Action) => void;
   sendChat: (message: string) => void;
@@ -102,6 +104,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     set({ gameState: state });
   });
   socket.on("gameStarted", () => set({ gameStarted: true }));
+  socket.on("layoutChanged", (layoutId) => set({ selectedLayoutId: layoutId }));
   socket.on("error", (msg) => set({ error: msg }));
   socket.on("playerJoined", (player) =>
     set((s) => ({ waitingPlayers: [...s.waitingPlayers.filter((p) => p.id !== player.id), player] }))
@@ -122,6 +125,7 @@ export const useGameStore = create<GameStore>((set, get) => {
     connected: false,
     error: null,
     waitingPlayers: [],
+    selectedLayoutId: "standard",
     gameState: null,
     gameStarted: false,
     chatMessages: [],
@@ -149,6 +153,11 @@ export const useGameStore = create<GameStore>((set, get) => {
         chatMessages: [],
         error: null,
       });
+    },
+
+    setLayout(layoutId) {
+      set({ selectedLayoutId: layoutId });
+      socket.emit("setLayout", layoutId);
     },
 
     startGame() {

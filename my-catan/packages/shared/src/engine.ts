@@ -7,6 +7,7 @@
 
 import type {
   Action,
+  BoardLayout,
   CubeCoord,
   DevCardType,
   GameHistory,
@@ -26,14 +27,8 @@ import {
   RESOURCE_TYPES,
   VP_TO_WIN,
 } from "./types.js";
-import { generateBoard } from "./board.js";
+import { generateBoard, portAtVertex, tilesForVertex } from "./board.js";
 import { cubeKey, hexVertexIds } from "./hex.js";
-import {
-  boardAdjacentEdges,
-  LAND_COORDS,
-  portAtVertex,
-  tilesForVertex,
-} from "./board.js";
 import {
   calculateVP,
   canPlaceCity,
@@ -410,8 +405,14 @@ function applyActionMut(state: GameState, playerId: string, action: Action): voi
         "Cannot move robber now"
       );
       const newKey = cubeKey(action.coord);
-      const isLand = LAND_COORDS.some((c) => cubeKey(c) === newKey);
+      const isLand = state.board.landHexes.some((c) => cubeKey(c) === newKey);
       assert(isLand, "Robber must be placed on a land tile");
+
+      const currentRobberTile = state.board.tiles.find((t) => t.hasRobber);
+      assert(
+        !currentRobberTile || cubeKey(currentRobberTile.coord) !== newKey,
+        "Robber must move to a different tile"
+      );
 
       // Remove from current location
       const current = state.board.tiles.find((t) => t.hasRobber);
@@ -699,7 +700,8 @@ function stealFrom(state: GameState, thief: Player, victim: Player): void {
 
 export function createGame(
   gameId: string,
-  players: Array<{ id: string; name: string; color: import("./types.js").PlayerColor }>
+  players: Array<{ id: string; name: string; color: import("./types.js").PlayerColor }>,
+  layout: BoardLayout
 ): GameState {
   const emptyResources = (): Resources =>
     ({ wood: 0, brick: 0, wheat: 0, ore: 0, sheep: 0 });
@@ -733,11 +735,12 @@ export function createGame(
 
   return {
     id: gameId,
+    layoutId: layout.id,
     phase: "setup",
     turnPhase: "preRoll",
     players: gamePlayers,
     currentPlayerIndex: 0,
-    board: generateBoard(),
+    board: generateBoard(layout),
     dice: null,
     bank: { ...BANK_INITIAL },
     devCardDeck: buildDevDeck(),

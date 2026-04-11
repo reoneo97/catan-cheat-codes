@@ -75,6 +75,15 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("setLayout", (layoutId) => {
+    if (!currentRoomId) { socket.emit("error", "Not in a room"); return; }
+    const room = rooms.get(currentRoomId);
+    if (!room) return;
+    const err = room.setLayout(layoutId);
+    if (err) { socket.emit("error", err); return; }
+    io.to(currentRoomId).emit("layoutChanged", layoutId);
+  });
+
   socket.on("startGame", () => {
     if (!currentRoomId) {
       socket.emit("error", "Not in a room");

@@ -71,6 +71,8 @@ export interface Board {
   buildings: Record<VertexId, Building>;
   roads: Record<EdgeId, Road>;
   ports: Port[];
+  /** The land hex coords for this board — drives all adjacency queries. */
+  landHexes: CubeCoord[];
 }
 
 // ── Development Cards ─────────────────────────────────────────────────────────
@@ -173,6 +175,33 @@ export type Action =
   | { type: "endTurn" }
   | { type: "devGrant"; resource: ResourceType };
 
+// ── Board Layouts ─────────────────────────────────────────────────────────────
+
+/**
+ * A port definition in human-editable form.
+ * Reference a coastal hex by coord, then specify which two vertex indices
+ * (0–5, clockwise from top) face the sea.
+ */
+export interface PortDef {
+  hex: CubeCoord;
+  vertexIndices: [number, number];
+  resource: PortResource;
+}
+
+/**
+ * A board layout is pure declarative data — no logic, no code.
+ * Add a new layout by creating a new object conforming to this interface.
+ */
+export interface BoardLayout {
+  id: string;
+  label: string;
+  players: { min: number; max: number };
+  landHexes: CubeCoord[];
+  terrainDistribution: TerrainType[];
+  numberDistribution: number[];
+  ports: PortDef[];
+}
+
 // ── Game History ─────────────────────────────────────────────────────────────
 
 export interface GameHistory {
@@ -186,6 +215,7 @@ export interface GameHistory {
 
 export interface GameState {
   id: string;
+  layoutId: string;
   phase: GamePhase;
   turnPhase: TurnPhase;
   players: Player[];
@@ -231,12 +261,14 @@ export interface ServerToClientEvents {
   error: (message: string) => void;
   playerJoined: (player: { id: string; name: string; color: PlayerColor }) => void;
   playerLeft: (playerId: string) => void;
+  layoutChanged: (layoutId: string) => void;
   gameStarted: () => void;
   chatMessage: (msg: ChatMessage) => void;
 }
 
 export interface ClientToServerEvents {
   joinRoom: (roomId: string, playerName: string, playerId: string) => void;
+  setLayout: (layoutId: string) => void;
   startGame: () => void;
   restartGame: () => void;
   action: (action: Action) => void;

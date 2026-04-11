@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import type { ClientGameState } from "@hexlands/shared";
+import { LAYOUTS } from "@hexlands/shared";
 import { useGameStore } from "./store.js";
 import { BoardView } from "./components/Board.js";
 import { PlayerPanel } from "./components/PlayerPanel.js";
@@ -63,7 +64,7 @@ function JoinForm({ defaultRoom }: { defaultRoom: string }) {
 // ── Waiting room ──────────────────────────────────────────────────────────────
 
 function WaitingRoom() {
-  const { roomId, playerName, connected, waitingPlayers, startGame, leave } = useGameStore();
+  const { roomId, playerName, connected, waitingPlayers, startGame, setLayout, selectedLayoutId, leave } = useGameStore();
   const navigate = useNavigate();
   const shareUrl = `${window.location.origin}/room/${roomId}`;
   const [copied, setCopied] = useState(false);
@@ -116,6 +117,35 @@ function WaitingRoom() {
           {waitingPlayers.length === 0 && (
             <span style={{ color: "#555", fontSize: 13 }}>Waiting for players…</span>
           )}
+        </div>
+      </div>
+
+      <div className="room-card">
+        <div className="room-label">Map Layout</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+          {Object.values(LAYOUTS).map((layout) => (
+            <label
+              key={layout.id}
+              style={{
+                display: "flex", alignItems: "center", gap: 8,
+                cursor: "pointer", padding: "6px 10px", borderRadius: 6,
+                border: `1px solid ${selectedLayoutId === layout.id ? "#f0c040" : "#30363d"}`,
+                background: selectedLayoutId === layout.id ? "rgba(240,192,64,0.08)" : "transparent",
+              }}
+            >
+              <input
+                type="radio" name="layout" value={layout.id}
+                checked={selectedLayoutId === layout.id}
+                onChange={() => setLayout(layout.id)}
+              />
+              <span>
+                <strong style={{ color: "#e0e0e0" }}>{layout.label}</strong>
+                <span style={{ color: "#888", fontSize: 11, marginLeft: 8 }}>
+                  {layout.players.min}–{layout.players.max} players · {layout.landHexes.length} hexes
+                </span>
+              </span>
+            </label>
+          ))}
         </div>
       </div>
 

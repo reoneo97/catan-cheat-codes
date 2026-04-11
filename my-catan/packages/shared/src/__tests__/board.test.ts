@@ -1,28 +1,29 @@
 import { describe, it, expect } from "vitest";
 import { generateBoard } from "../board.js";
+import { STANDARD_LAYOUT } from "../layouts.js";
 import { cubeKey, CUBE_DIRECTIONS, cubeAdd } from "../hex.js";
 
 describe("generateBoard", () => {
   it("produces 19 land tiles", () => {
-    const board = generateBoard();
+    const board = generateBoard(STANDARD_LAYOUT);
     const land = board.tiles.filter((t) => t.terrain !== "sea");
     expect(land).toHaveLength(19);
   });
 
   it("has exactly one desert tile", () => {
-    const board = generateBoard();
+    const board = generateBoard(STANDARD_LAYOUT);
     const deserts = board.tiles.filter((t) => t.terrain === "desert");
     expect(deserts).toHaveLength(1);
   });
 
   it("desert tile has no number token", () => {
-    const board = generateBoard();
+    const board = generateBoard(STANDARD_LAYOUT);
     const desert = board.tiles.find((t) => t.terrain === "desert")!;
     expect(desert.number).toBeUndefined();
   });
 
   it("exactly one tile starts with the robber (on desert)", () => {
-    const board = generateBoard();
+    const board = generateBoard(STANDARD_LAYOUT);
     const withRobber = board.tiles.filter((t) => t.hasRobber);
     expect(withRobber).toHaveLength(1);
     expect(withRobber[0].terrain).toBe("desert");
@@ -31,7 +32,7 @@ describe("generateBoard", () => {
   it("no two 6/8 tiles are adjacent", () => {
     // Run multiple boards to check the constraint holds consistently
     for (let attempt = 0; attempt < 5; attempt++) {
-      const board = generateBoard();
+      const board = generateBoard(STANDARD_LAYOUT);
       const byKey = new Map(board.tiles.map((t) => [cubeKey(t.coord), t]));
 
       for (const tile of board.tiles) {
@@ -50,7 +51,7 @@ describe("generateBoard", () => {
 
   it("no two 2/12 tiles are adjacent", () => {
     for (let attempt = 0; attempt < 5; attempt++) {
-      const board = generateBoard();
+      const board = generateBoard(STANDARD_LAYOUT);
       const byKey = new Map(board.tiles.map((t) => [cubeKey(t.coord), t]));
 
       for (const tile of board.tiles) {
@@ -68,12 +69,12 @@ describe("generateBoard", () => {
   });
 
   it("has 9 ports", () => {
-    const board = generateBoard();
+    const board = generateBoard(STANDARD_LAYOUT);
     expect(board.ports).toHaveLength(9);
   });
 
   it("number tokens appear in correct quantities", () => {
-    const board = generateBoard();
+    const board = generateBoard(STANDARD_LAYOUT);
     const counts: Record<number, number> = {};
     for (const tile of board.tiles) {
       if (tile.number) counts[tile.number] = (counts[tile.number] ?? 0) + 1;

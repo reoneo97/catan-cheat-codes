@@ -1,5 +1,5 @@
 import type { Action, ClientGameState, GameState, PlayerColor } from "@hexlands/shared";
-import { applyAction, createGame, PLAYER_COLORS } from "@hexlands/shared";
+import { applyAction, createGame, DEFAULT_LAYOUT_ID, LAYOUTS, PLAYER_COLORS } from "@hexlands/shared";
 import type { Server, Socket } from "socket.io";
 import { loadRoom, saveRoom } from "./redis.js";
 
@@ -15,10 +15,19 @@ export class GameRoom {
   private players: RoomPlayer[] = [];
   private state: GameState | null = null;
   private io: Server;
+  private layoutId: string;
 
-  constructor(id: string, io: Server) {
+  constructor(id: string, io: Server, layoutId = DEFAULT_LAYOUT_ID) {
     this.id = id;
     this.io = io;
+    this.layoutId = LAYOUTS[layoutId] ? layoutId : DEFAULT_LAYOUT_ID;
+  }
+
+  setLayout(layoutId: string): string | null {
+    if (this.hasStarted) return "Cannot change layout after game has started";
+    if (!LAYOUTS[layoutId]) return `Unknown layout: ${layoutId}`;
+    this.layoutId = layoutId;
+    return null;
   }
 
   get playerCount(): number {
@@ -99,9 +108,11 @@ export class GameRoom {
     if (!this.hasStarted) return "Game not started";
     if (!this.players.find((p) => p.socketId === socketId)) return "Not in room";
 
+    const layout = LAYOUTS[this.layoutId];
     this.state = createGame(
       this.id,
-      this.players.map((p) => ({ id: p.id, name: p.name, color: p.color }))
+      this.players.map((p) => ({ id: p.id, name: p.name, color: p.color })),
+      layout
     );
     this.broadcast();
     return null;
@@ -110,12 +121,13 @@ export class GameRoom {
   startGame(socketId: string): string | null {
     if (this.hasStarted) return "Already started";
     if (this.players.length < 2) return "Need at least 2 players";
-    const requester = this.players.find((p) => p.socketId === socketId);
-    if (!requester) return "Not in room";
+    if (!this.players.find((p) => p.socketId === socketId)) return "Not in room";
 
+    const layout = LAYOUTS[this.layoutId];
     this.state = createGame(
       this.id,
-      this.players.map((p) => ({ id: p.id, name: p.name, color: p.color }))
+      this.players.map((p) => ({ id: p.id, name: p.name, color: p.color })),
+      layout
     );
     this.broadcast();
     return null;

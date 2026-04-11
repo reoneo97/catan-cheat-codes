@@ -5,7 +5,7 @@
 
 import React, { useMemo, useEffect, useState, useRef } from "react";
 import type { Board, ClientGameState, CubeCoord, Port, Tile } from "@hexlands/shared";
-import { STANDARD_LAND_HEXES, hexCornerPixel, hexEdgeIds, hexToPixel, hexVertexIds, cubeKey, edgeVertices, edgeHexKeys, boardAdjacentEdges, canPlaceSettlement, canPlaceCity, canPlaceRoad, validInitialSettlementVertices, validInitialRoadEdges } from "@hexlands/shared";
+import { hexCornerPixel, hexEdgeIds, hexToPixel, hexVertexIds, cubeKey, edgeVertices, edgeHexKeys, boardAdjacentEdges, canPlaceSettlement, canPlaceCity, canPlaceRoad, validInitialSettlementVertices, validInitialRoadEdges } from "@hexlands/shared";
 import { useGameStore } from "../store.js";
 import { triggerFlight } from "../flightBus.js";
 
@@ -78,11 +78,11 @@ function hexPolygonPoints(coord: CubeCoord): string {
   }).join(" ");
 }
 
-function vertexPixel(vertexId: string): { x: number; y: number } | null {
+function vertexPixel(vertexId: string, landHexes: CubeCoord[]): { x: number; y: number } | null {
   // Find a hex that contains this vertex and get its corner position.
   // hexVertexIds index i (0=top, 1=top-right, …) maps to hexCornerPixel
   // index (i+5)%6 because hexCornerPixel starts at -30° (top-right) not -90° (top).
-  for (const coord of STANDARD_LAND_HEXES) {
+  for (const coord of landHexes) {
     const vIds = hexVertexIds(coord);
     const idx = vIds.indexOf(vertexId);
     if (idx === -1) continue;
@@ -94,12 +94,12 @@ function vertexPixel(vertexId: string): { x: number; y: number } | null {
 
 type Point = { x: number; y: number };
 
-function edgeEndpoints(edgeId: string): { p1: Point; p2: Point; mid: Point } | null {
+function edgeEndpoints(edgeId: string, landHexes: CubeCoord[]): { p1: Point; p2: Point; mid: Point } | null {
   const [h1Key, h2Key] = edgeHexKeys(edgeId);
   const parse = (k: string) => { const [q, r, s] = k.split(",").map(Number); return { q, r, s }; };
   const [v1Id, v2Id] = edgeVertices(parse(h1Key), parse(h2Key));
-  const p1 = vertexPixel(v1Id);
-  const p2 = vertexPixel(v2Id);
+  const p1 = vertexPixel(v1Id, landHexes);
+  const p2 = vertexPixel(v2Id, landHexes);
   if (!p1 || !p2) return null;
   return { p1, p2, mid: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 } };
 }
@@ -123,7 +123,7 @@ function longestRoadEdges(board: Board, playerId: string): Set<string> {
     for (const v of [v1, v2]) {
       const building = board.buildings[v];
       if (building && building.playerId !== playerId) continue;
-      for (const adjEid of boardAdjacentEdges(v)) {
+      for (const adjEid of boardAdjacentEdges(v, board)) {
         if (!current.has(adjEid) && board.roads[adjEid]?.playerId === playerId) {
           const result = dfs(adjEid, current);
           if (result.size > best.size) best = result;
@@ -158,9 +158,9 @@ function plankPoints(from: Point, to: Point, halfW: number): string {
   ].join(" ");
 }
 
-function PortMarker({ port }: { port: Port }) {
-  const p1 = vertexPixel(port.vertices[0]);
-  const p2 = vertexPixel(port.vertices[1]);
+function PortMarker({ port, landHexes }: { port: Port; landHexes: CubeCoord[] }) {
+  const p1 = vertexPixel(port.vertices[0], landHexes);
+  const p2 = vertexPixel(port.vertices[1], landHexes);
   if (!p1 || !p2) return null;
 
   const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
@@ -388,10 +388,10 @@ export function BoardView({ state }: BoardProps) {
     if (turnPhase !== "movingRobber") setSelectedRobberCoord(null);
   }, [turnPhase]);
 
-  // Collect all unique vertex IDs on the board
+  // Derive vertex/edge sets from the board's own landHexes (layout-agnostic)
   const allVertexIds = new Set<string>();
   const allEdgeIds = new Set<string>();
-  for (const hex of STANDARD_LAND_HEXES) {
+  for (const hex of board.landHexes) {
     hexVertexIds(hex).forEach((v) => allVertexIds.add(v));
     hexEdgeIds(hex).forEach((e) => allEdgeIds.add(e));
   }
@@ -572,12 +572,12 @@ export function BoardView({ state }: BoardProps) {
 
       {/* Ports */}
       {board.ports.map((port, i) => (
-        <PortMarker key={i} port={port} />
+        <PortMarker key={i} port={port} landHexes={board.landHexes} />
       ))}
 
       {/* Edges (roads + clickable areas) */}
       {Array.from(allEdgeIds).map((eid) => {
-        const ep = edgeEndpoints(eid);
+        const ep = edgeEndpoints(eid, board.landHexes);
         if (!ep) return null;
         const { p1, p2, mid } = ep;
         const road = board.roads[eid];
@@ -622,7 +622,7 @@ export function BoardView({ state }: BoardProps) {
 
       {/* Vertices (settlements/cities + clickable areas) */}
       {Array.from(allVertexIds).map((vid) => {
-        const pos = vertexPixel(vid);
+        const pos = vertexPixel(vid, board.landHexes);
         if (!pos) return null;
         const building = board.buildings[vid];
         const isSelected = selectedVertexId === vid;
@@ -663,7 +663,7 @@ export function BoardView({ state }: BoardProps) {
       {selectedRobberCoord && hexVertexIds(selectedRobberCoord).flatMap((vid) => {
         const building = board.buildings[vid];
         if (!building) return [];
-        const bpos = vertexPixel(vid);
+        const bpos = vertexPixel(vid, board.landHexes);
         if (!bpos) return [];
         const S = 8;
         return [(
@@ -676,14 +676,14 @@ export function BoardView({ state }: BoardProps) {
 
       {/* Vertex confirmation */}
       {selectedVertexId && (() => {
-        const pos = vertexPixel(selectedVertexId);
+        const pos = vertexPixel(selectedVertexId, board.landHexes);
         if (!pos) return null;
         return <ConfirmAction pos={pos} onConfirm={confirmVertex} onCancel={() => selectVertex(null)} />;
       })()}
 
       {/* Edge confirmation */}
       {selectedEdgeId && (() => {
-        const ep = edgeEndpoints(selectedEdgeId);
+        const ep = edgeEndpoints(selectedEdgeId, board.landHexes);
         if (!ep) return null;
         return <ConfirmAction pos={ep.mid} onConfirm={confirmEdge} onCancel={() => selectEdge(null)} />;
       })()}

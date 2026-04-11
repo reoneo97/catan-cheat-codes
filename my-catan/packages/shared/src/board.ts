@@ -1,56 +1,13 @@
 /**
- * Board generation for the standard Catan setup.
- * Produces a randomized board following official tile and number token distributions.
- */
-
-import type { Board, CubeCoord, Port, ResourceType, TerrainType, Tile, VertexId } from "./types.js";
-import { STANDARD_LAND_HEXES, cubeAdd, cubeKey, edgeId, hexVertexIds, CUBE_DIRECTIONS } from "./hex.js";
-
-// ── Tile distribution ─────────────────────────────────────────────────────────
-
-const TERRAIN_DISTRIBUTION: TerrainType[] = [
-  "wood", "wood", "wood", "wood",
-  "sheep", "sheep", "sheep", "sheep",
-  "wheat", "wheat", "wheat", "wheat",
-  "ore", "ore", "ore",
-  "brick", "brick", "brick",
-  "desert",
-];
-
-/** Official number token distribution (excludes desert, which gets no number). */
-const NUMBER_DISTRIBUTION = [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12];
-
-// ── Port configuration ────────────────────────────────────────────────────────
-
-/**
- * Ports are placed on the edge of the board. Each port occupies two adjacent
- * vertices on the coast. We define them by the hex coord just inside the board
- * and the two vertex indices (0–5) facing outward.
+ * Board generation and query helpers.
  *
- * Standard Catan has 9 ports (5 specific + 4 generic 3:1).
+ * generateBoard(layout) produces a randomised Board from any BoardLayout.
+ * All query functions (adjacency, land checks, etc.) derive the board
+ * shape from board.landHexes rather than a hardcoded global.
  */
-interface PortDef {
-  hex: CubeCoord;
-  vertexIndices: [number, number];
-  resource: ResourceType | "generic";
-}
 
-const PORT_DEFINITIONS: PortDef[] = [
-  // NW coast
-  { hex: { q: 0, r: -2, s: 2 },  vertexIndices: [5, 0], resource: "generic" },
-  { hex: { q: 1, r: -2, s: 1 },  vertexIndices: [0, 1], resource: "ore" },
-  // NE coast
-  { hex: { q: 2, r: -2, s: 0 },  vertexIndices: [0, 1], resource: "generic" },
-  { hex: { q: 2, r: -1, s: -1 }, vertexIndices: [1, 2], resource: "wheat" },
-  // E coast
-  { hex: { q: 2, r: 0, s: -2 },  vertexIndices: [1, 2], resource: "generic" },
-  // SE coast
-  { hex: { q: 1, r: 1, s: -2 },  vertexIndices: [2, 3], resource: "generic" },
-  { hex: { q: 0, r: 2, s: -2 },  vertexIndices: [3, 4], resource: "sheep" },
-  // SW coast
-  { hex: { q: -1, r: 2, s: -1 }, vertexIndices: [3, 4], resource: "brick" },
-  { hex: { q: -2, r: 1, s: 1 },  vertexIndices: [4, 5], resource: "wood" },
-];
+import type { Board, BoardLayout, CubeCoord, Port, TerrainType, Tile, VertexId } from "./types.js";
+import { cubeAdd, cubeKey, edgeId, hexVertexIds, CUBE_DIRECTIONS } from "./hex.js";
 
 // ── Fisher-Yates shuffle ──────────────────────────────────────────────────────
 
@@ -68,8 +25,6 @@ function shuffle<T>(arr: T[]): T[] {
 /**
  * Returns true if no two "red" numbers (6 or 8) are on adjacent hexes,
  * and no two extreme numbers (2 or 12) are on adjacent hexes.
- * These are the standard fair-play constraints used by virtually every
- * digital Catan implementation.
  */
 function hasValidNumberPlacement(tiles: Tile[]): boolean {
   const byKey = new Map(tiles.map((t) => [cubeKey(t.coord), t]));
@@ -90,22 +45,21 @@ function hasValidNumberPlacement(tiles: Tile[]): boolean {
 
 // ── Board generation ──────────────────────────────────────────────────────────
 
-export function generateBoard(): Board {
-  // Retry until the number placement satisfies adjacency constraints.
-  // In practice this converges in < 20 attempts on average.
+/**
+ * Generate a randomised Board from a layout definition.
+ * Retries until number placement satisfies adjacency fairness constraints.
+ */
+export function generateBoard(layout: BoardLayout): Board {
   let tiles: Tile[] = [];
-  let desertCoord: CubeCoord | undefined;
 
   for (let attempt = 0; attempt < 500; attempt++) {
-    const terrains = shuffle(TERRAIN_DISTRIBUTION);
-    const numbers = shuffle(NUMBER_DISTRIBUTION);
+    const terrains = shuffle(layout.terrainDistribution);
+    const numbers = shuffle(layout.numberDistribution);
     let numberIndex = 0;
-    desertCoord = undefined;
 
-    const candidate: Tile[] = STANDARD_LAND_HEXES.map((coord, i) => {
-      const terrain = terrains[i];
+    const candidate: Tile[] = layout.landHexes.map((coord, i) => {
+      const terrain = terrains[i] as TerrainType;
       const isDesert = terrain === "desert";
-      if (isDesert) desertCoord = coord;
       return {
         coord,
         terrain,
@@ -120,14 +74,12 @@ export function generateBoard(): Board {
     }
   }
 
-  // Build ports from definitions
-  const ports: Port[] = PORT_DEFINITIONS.map((def) => {
+  const ports: Port[] = layout.ports.map((def) => {
     const vIds = hexVertexIds(def.hex);
-    const resource = def.resource === "generic" ? "generic" : def.resource;
     return {
       vertices: [vIds[def.vertexIndices[0]], vIds[def.vertexIndices[1]]],
-      resource,
-      ratio: resource === "generic" ? 3 : 2,
+      resource: def.resource,
+      ratio: def.resource === "generic" ? 3 : 2,
     } satisfies Port;
   });
 
@@ -136,84 +88,85 @@ export function generateBoard(): Board {
     buildings: {},
     roads: {},
     ports,
+    landHexes: layout.landHexes,
   };
 }
 
-// ── Board query helpers ───────────────────────────────────────────────────────
+// ── Land hex lookups ──────────────────────────────────────────────────────────
 
-/** All land hex cube coords. */
-export const LAND_COORDS = STANDARD_LAND_HEXES;
-
-/** Set of land hex keys for O(1) lookup. */
-const LAND_KEY_SET = new Set(STANDARD_LAND_HEXES.map(cubeKey));
-
-export function isLandHex(coord: CubeCoord): boolean {
-  return LAND_KEY_SET.has(cubeKey(coord));
+/** O(1) land hex lookup keyed by cubeKey. */
+function makeLandKeySet(landHexes: CubeCoord[]): Set<string> {
+  return new Set(landHexes.map(cubeKey));
 }
 
-/**
- * All vertex IDs on the standard board (derived from all land hexes).
- */
-export function allVertexIds(): VertexId[] {
+export function isLandHex(coord: CubeCoord, board: Board): boolean {
+  return makeLandKeySet(board.landHexes).has(cubeKey(coord));
+}
+
+// ── Vertex helpers ────────────────────────────────────────────────────────────
+
+/** All vertex IDs present on the board (derived from landHexes). */
+export function allBoardVertexIds(board: Board): VertexId[] {
   const seen = new Set<VertexId>();
-  for (const hex of STANDARD_LAND_HEXES) {
-    for (const v of hexVertexIds(hex)) {
-      seen.add(v);
-    }
+  for (const hex of board.landHexes) {
+    for (const v of hexVertexIds(hex)) seen.add(v);
   }
   return Array.from(seen);
 }
 
 /**
- * Vertices adjacent (distance-1) to a given vertex that are on the board.
+ * Vertex IDs adjacent (distance-1) to a given vertex, restricted to vertices
+ * that exist on the board.
  */
 export function boardAdjacentVertices(vertexId: VertexId, board: Board): VertexId[] {
-  const all = allVertexIds();
-  // Find adjacent hexes: a vertex is in up to 3 hexes
-  const result: VertexId[] = [];
-  for (const hex of STANDARD_LAND_HEXES) {
+  const all = new Set(allBoardVertexIds(board));
+  const result = new Set<VertexId>();
+
+  for (const hex of board.landHexes) {
     const vIds = hexVertexIds(hex);
     const idx = vIds.indexOf(vertexId);
     if (idx === -1) continue;
-    // Neighbors within this hex
-    result.push(vIds[(idx + 1) % 6]);
-    result.push(vIds[(idx + 5) % 6]);
+    result.add(vIds[(idx + 1) % 6]);
+    result.add(vIds[(idx + 5) % 6]);
   }
-  return [...new Set(result)].filter((v) => all.includes(v));
+
+  return Array.from(result).filter((v) => all.has(v));
 }
 
 /**
  * Edge IDs adjacent to a vertex that are on the board.
+ * Includes coastal edges (land-sea) since roads can be placed along the coast.
+ * Sea-sea edges are never returned because we only iterate over land hexes.
  */
-export function boardAdjacentEdges(vertexId: VertexId): string[] {
+export function boardAdjacentEdges(vertexId: VertexId, board: Board): string[] {
   const result = new Set<string>();
-  for (const hex of STANDARD_LAND_HEXES) {
+
+  for (const hex of board.landHexes) {
     const vIds = hexVertexIds(hex);
     const idx = vIds.indexOf(vertexId);
     if (idx === -1) continue;
-    // Edges of this hex touching vertex idx
-    const neighbors = CUBE_DIRECTIONS.map((d) => cubeAdd(hex, d));
-    // edge idx: between this hex and neighbor[idx]
-    // edge (idx+5)%6: between this hex and neighbor[(idx+5)%6]
-    [idx, (idx + 5) % 6].forEach((edgeDir) => {
-      const neighbor = neighbors[edgeDir];
-      // Only add edge if at least one of the hexes is a land hex
+
+    for (const edgeDir of [idx, (idx + 5) % 6]) {
+      const neighbor = cubeAdd(hex, CUBE_DIRECTIONS[edgeDir]);
       result.add(edgeId(hex, neighbor));
-    });
+    }
   }
+
   return Array.from(result);
 }
 
-/**
- * Tiles that produce resources for a given vertex (settlement/city location).
- */
+// ── Tile helpers ──────────────────────────────────────────────────────────────
+
+/** Tiles adjacent to a vertex (up to 3). */
 export function tilesForVertex(vertexId: VertexId, tiles: Tile[]): Tile[] {
   return tiles.filter((tile) => hexVertexIds(tile.coord).includes(vertexId));
 }
 
-/**
- * Returns the port at a given vertex, or undefined if none.
- */
+/** Returns the port at a given vertex, or undefined if none. */
 export function portAtVertex(vertexId: VertexId, ports: Port[]): Port | undefined {
   return ports.find((p) => p.vertices.includes(vertexId));
 }
+
+// ── Legacy export ─────────────────────────────────────────────────────────────
+// Kept for any direct imports; prefer board.landHexes.
+export { STANDARD_LAND_HEXES as LAND_COORDS } from "./hex.js";

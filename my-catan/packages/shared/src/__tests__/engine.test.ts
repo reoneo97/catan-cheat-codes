@@ -6,6 +6,7 @@ import {
   validInitialRoadEdges,
   tradeRatioForResource,
 } from "../index.js";
+import { STANDARD_LAYOUT } from "../layouts.js";
 import type { GameState, ResourceType } from "../index.js";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -14,7 +15,7 @@ const PLAYER_A = { id: "p1", name: "Alice", color: "red" as const };
 const PLAYER_B = { id: "p2", name: "Bob", color: "blue" as const };
 
 function newGame() {
-  return createGame("test-room", [PLAYER_A, PLAYER_B]);
+  return createGame("test-room", [PLAYER_A, PLAYER_B], STANDARD_LAYOUT);
 }
 
 /**
